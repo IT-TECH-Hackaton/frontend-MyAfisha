@@ -1,30 +1,5 @@
 import type { Event, EventStatus } from "@modules/events/types/event";
 
-const statusLabel: Record<EventStatus, string> = {
-  active: "Активное",
-  past: "Прошедшее",
-  declined: "Отклонено"
-};
-
-const deriveStatus = (event: Event, now = new Date()): EventStatus => {
-  if (event.status === "declined") return "declined";
-
-  const start = new Date(event.startDate);
-  const end = new Date(event.endDate);
-
-  if (now > end) return "past";
-  if (now >= start && now <= end) return "active";
-
-  // будущие события считаем активными для афиши
-  return "active";
-};
-
-export const updateEventStatuses = (events: Event[], now = new Date()): Event[] =>
-  events.map((event) => ({
-    ...event,
-    status: deriveStatus(event, now)
-  }));
-
 export const formatEventDateRange = (startDate: string, endDate: string): string => {
   const start = new Date(startDate);
   const end = new Date(endDate);
@@ -51,6 +26,32 @@ export const isDateWithinEvent = (event: Event, date: Date): boolean => {
 
   return start <= dayEnd && end >= dayStart;
 };
+
+export const statusLabel: Record<EventStatus, string> = {
+  active: "Активное",
+  past: "Прошедшее",
+  declined: "Отклонено"
+};
+
+const deriveStatus = (event: Event, now = new Date()): EventStatus => {
+  if (event.status === "declined") return "declined";
+
+  const start = new Date(event.startDate);
+  const end = new Date(event.endDate);
+
+  if (now > end) return "past";
+  if (now >= start && now <= end) return "active";
+
+  return "active";
+};
+
+export const updateEventStatuses = (events: Event[], now = new Date()): Event[] =>
+  events.map((event) => ({
+    ...event,
+    status: deriveStatus(event, now)
+  }));
+
+export const getStatusLabel = (status: EventStatus) => statusLabel[status];
 
 export const mockEvents: Event[] = [
   {
@@ -152,13 +153,161 @@ export const mockEvents: Event[] = [
     userParticipating: false,
     location: "Частный кинозал, Таганрог",
     coordinates: { lat: 47.240, lon: 38.900 }
+    location: "Частный кинозал"
+  },
+  {
+    id: "e7",
+    title: "Премьера фильма «Барби»",
+    shortDescription: "Розовый дресс-код и фотозона у входа.",
+    description:
+      "Специальный показ с интерактивом перед началом и мерчем в фойе. После фильма — обсуждение с кинокритиком.",
+    startDate: "2025-12-18T19:00:00",
+    endDate: "2025-12-18T21:30:00",
+    imageUrl: "/barbie.jpg",
+    participantsCount: 220,
+    participantsLimit: 300,
+    status: "active",
+    paymentInfo: "Билеты от 700 ₽",
+    userParticipating: false,
+    location: "Кинотеатр Космос"
+  },
+  {
+    id: "e8",
+    title: "Ночной показ «Оппенгеймер»",
+    shortDescription: "IMAX, 70 мм пленка и лекция о фильме.",
+    description:
+      "Ретроспектива Нолана, редкая пленочная копия, перед сеансом — лекция о физике проекта Manhattan.",
+    startDate: "2025-12-15T23:00:00",
+    endDate: "2025-12-16T02:30:00",
+    imageUrl: "/opengamer.jpg",
+    participantsCount: 260,
+    participantsLimit: 280,
+    status: "active",
+    paymentInfo: "Билеты от 1200 ₽",
+    userParticipating: true,
+    location: "Каро 11 Октябрь"
+  },
+  {
+    id: "e9",
+    title: "Кинопоказ «Дюна: Часть вторая»",
+    shortDescription: "Большой зал, субтитры и премиум звук.",
+    description:
+      "Показ в зале с Dolby Atmos. Перед фильмом — квиз по вселенной Герберта, призы от организаторов.",
+    startDate: "2025-12-21T18:00:00",
+    endDate: "2025-12-21T21:00:00",
+    imageUrl: "/duna.jpg",
+    participantsCount: 180,
+    participantsLimit: 220,
+    status: "active",
+    paymentInfo: "Билеты от 950 ₽",
+    userParticipating: false,
+    location: "Синема Парк Афимолл"
+  },
+  {
+    id: "e10",
+    title: "Культовый показ «Бэтмен»",
+    shortDescription: "Темный зал, живой саундтрек органом.",
+    description:
+      "Симфонический ансамбль играет ключевые темы во время сеанса. Эксклюзивный мерч DC в лобби.",
+    startDate: "2025-12-29T19:30:00",
+    endDate: "2025-12-29T22:30:00",
+    imageUrl: "/batman2022.jpg",
+    participantsCount: 140,
+    participantsLimit: 200,
+    status: "active",
+    paymentInfo: "Билеты от 1100 ₽",
+    userParticipating: false,
+    location: "Театр Музыки и Кино"
+  },
+  {
+    id: "e11",
+    title: "Архипелаг: показ «Паразиты»",
+    shortDescription: "Обсуждение феномена корейского кино.",
+    description:
+      "После показа — круглый стол с переводчиком и кинокритиком, кофе-брейк и нетворкинг.",
+    startDate: "2025-12-11T18:30:00",
+    endDate: "2025-12-11T21:00:00",
+    imageUrl: "/parasite.webp",
+    participantsCount: 95,
+    participantsLimit: 120,
+    status: "active",
+    paymentInfo: "Билеты от 800 ₽",
+    userParticipating: false,
+    location: "Кинозал Гараж"
+  },
+  {
+    id: "e12",
+    title: "Музыкальный вечер «Джентльмены»",
+    shortDescription: "Саундтрек фильма в живом исполнении.",
+    description:
+      "Группа играет треки из фильма, на экране — культовые сцены. Дресс-код в стиле Пирсона приветствуется.",
+    startDate: "2025-12-20T20:00:00",
+    endDate: "2025-12-20T22:00:00",
+    imageUrl: "/gentelmen.jpg",
+    participantsCount: 150,
+    participantsLimit: 180,
+    status: "active",
+    paymentInfo: "Вход 900 ₽",
+    userParticipating: true,
+    location: "Главклуб"
+  },
+  {
+    id: "e13",
+    title: "Классика кино: «Космическая одиссея»",
+    shortDescription: "4K ремастер на большом экране.",
+    description:
+      "Вступительное слово от киноведа о влиянии Кубрика. В антракте — выставка постеров и редких кадров.",
+    startDate: "2025-12-26T19:00:00",
+    endDate: "2025-12-26T22:10:00",
+    imageUrl: "/odessey.jpg",
+    participantsCount: 70,
+    participantsLimit: 120,
+    status: "active",
+    paymentInfo: "Билеты от 850 ₽",
+    userParticipating: false,
+    location: "Москино Космос"
+  },
+  {
+    id: "e14",
+    title: "Детский утренник «Летние каникулы»",
+    shortDescription: "Анимация, конкурсы и мастер-класс.",
+    description:
+      "Показ семейного мультфильма, аквагрим и мастер-класс по созданию бумажных зверят. Подарки каждому ребенку.",
+    startDate: "2025-12-30T11:00:00",
+    endDate: "2025-12-30T14:00:00",
+    imageUrl: "/Vacaciones.jpg",
+    participantsCount: 45,
+    participantsLimit: 80,
+    status: "active",
+    paymentInfo: "Билеты от 500 ₽",
+    userParticipating: false,
+    location: "Культурный центр Зил"
+  },
+  {
+    id: "e15",
+    title: "Триллер-вечер «Достать ножи»",
+    shortDescription: "Киновикторина и приз за лучший костюм.",
+    description:
+      "Зрители в образах персонажей получают бонусы. Викторина по сюжету и скрытым отсылкам, приз — коллекционный постер.",
+    startDate: "2025-12-23T19:00:00",
+    endDate: "2025-12-23T21:30:00",
+    imageUrl: "/give-a-knife.webp",
+    participantsCount: 85,
+    participantsLimit: 100,
+    status: "active",
+    paymentInfo: "Билеты от 750 ₽",
+    userParticipating: false,
+    location: "Кинотеатр Пионер"
   }
 ];
 
 export const fetchEvents = async (): Promise<Event[]> => {
-  await new Promise((resolve) => setTimeout(resolve, 150));
+  await new Promise((resolve) => setTimeout(resolve, 120));
   return updateEventStatuses(mockEvents);
 };
 
-export const getStatusLabel = (status: EventStatus) => statusLabel[status];
-
+export const fetchEventById = async (id: string): Promise<Event | null> => {
+  await new Promise((resolve) => setTimeout(resolve, 120));
+  const found = mockEvents.find((item) => item.id === id);
+  return found ? { ...found } : null;
+};

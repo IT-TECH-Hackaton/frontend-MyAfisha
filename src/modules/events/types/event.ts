@@ -20,4 +20,6 @@ export interface Event {
   };
 }
 
-
+export interface EventsApiError {
+  message?: string;
+}
