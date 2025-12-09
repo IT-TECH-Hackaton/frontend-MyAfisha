@@ -4,7 +4,8 @@ import {
   SignUpPage,
   EmailVerifyPage,
   ForgotPasswordPage,
-  ResetPasswordPage
+  ResetPasswordPage,
+  OAuthCallbackPage
 } from "@modules/auth";
 import { ProfilePage } from "@modules/user/profile";
 import { createBrowserRouter } from "react-router-dom";
@@ -38,6 +39,10 @@ export const routes = createBrowserRouter([
       {
         path: PATHS.RESET_PASSWORD,
         element: <ResetPasswordPage />
+      },
+      {
+        path: PATHS.OAUTH_CALLBACK,
+        element: <OAuthCallbackPage />
       }
     ]
   },

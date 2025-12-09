@@ -6,5 +6,6 @@ export const PATHS = {
   TICKETS: "/tickets",
   FORGOT_PASSWORD: "/forgot-password",
   RESET_PASSWORD: "/reset-password",
-  EMAIL_VERIFY: "/email-verify"
+  EMAIL_VERIFY: "/email-verify",
+  OAUTH_CALLBACK: "/oauth/callback"
 } as const;

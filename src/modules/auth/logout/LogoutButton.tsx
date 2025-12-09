@@ -19,7 +19,11 @@ export const LogoutButton = () => {
   });
 
   return (
-    <Button onClick={() => mutate({})} variant='ghost' className='gap-2'>
+    <Button
+      onClick={() => mutate({})}
+      variant='ghost'
+      className='gap-2 hover:bg-red-500/10 hover:text-red-600 dark:hover:text-red-400'
+    >
       <LogOut className='h-4 w-4' />
       Выйти
     </Button>

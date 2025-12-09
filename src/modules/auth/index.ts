@@ -5,3 +5,4 @@ export * from "./logout/LogoutButton";
 export * from "./emailVerify";
 export * from "./forgotPassword";
 export * from "./resetPassword";
+export * from "./oauthCallback";
