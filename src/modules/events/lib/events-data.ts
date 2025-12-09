@@ -153,7 +153,6 @@ export const mockEvents: Event[] = [
     userParticipating: false,
     location: "Частный кинозал, Таганрог",
     coordinates: { lat: 47.240, lon: 38.900 }
-    location: "Частный кинозал"
   },
   {
     id: "e7",
@@ -169,7 +168,8 @@ export const mockEvents: Event[] = [
     status: "active",
     paymentInfo: "Билеты от 700 ₽",
     userParticipating: false,
-    location: "Кинотеатр Космос"
+    location: "Кинотеатр Космос, Таганрог",
+    coordinates: { lat: 47.235, lon: 38.898 }
   },
   {
     id: "e8",
@@ -185,7 +185,8 @@ export const mockEvents: Event[] = [
     status: "active",
     paymentInfo: "Билеты от 1200 ₽",
     userParticipating: true,
-    location: "Каро 11 Октябрь"
+    location: "Кинотеатр Октябрь, Таганрог",
+    coordinates: { lat: 47.242, lon: 38.892 }
   },
   {
     id: "e9",
@@ -201,7 +202,8 @@ export const mockEvents: Event[] = [
     status: "active",
     paymentInfo: "Билеты от 950 ₽",
     userParticipating: false,
-    location: "Синема Парк Афимолл"
+    location: "ТРЦ, Таганрог",
+    coordinates: { lat: 47.228, lon: 38.915 }
   },
   {
     id: "e10",
@@ -217,7 +219,8 @@ export const mockEvents: Event[] = [
     status: "active",
     paymentInfo: "Билеты от 1100 ₽",
     userParticipating: false,
-    location: "Театр Музыки и Кино"
+    location: "Театр Музыки и Кино, Таганрог",
+    coordinates: { lat: 47.245, lon: 38.888 }
   },
   {
     id: "e11",
@@ -233,7 +236,8 @@ export const mockEvents: Event[] = [
     status: "active",
     paymentInfo: "Билеты от 800 ₽",
     userParticipating: false,
-    location: "Кинозал Гараж"
+    location: "Кинозал Гараж, Таганрог",
+    coordinates: { lat: 47.232, lon: 38.905 }
   },
   {
     id: "e12",
@@ -249,7 +253,8 @@ export const mockEvents: Event[] = [
     status: "active",
     paymentInfo: "Вход 900 ₽",
     userParticipating: true,
-    location: "Главклуб"
+    location: "Главклуб, Таганрог",
+    coordinates: { lat: 47.238, lon: 38.900 }
   },
   {
     id: "e13",
@@ -265,7 +270,8 @@ export const mockEvents: Event[] = [
     status: "active",
     paymentInfo: "Билеты от 850 ₽",
     userParticipating: false,
-    location: "Москино Космос"
+    location: "Кинотеатр Космос, Таганрог",
+    coordinates: { lat: 47.240, lon: 38.895 }
   },
   {
     id: "e14",
@@ -281,7 +287,8 @@ export const mockEvents: Event[] = [
     status: "active",
     paymentInfo: "Билеты от 500 ₽",
     userParticipating: false,
-    location: "Культурный центр Зил"
+    location: "Культурный центр, Таганрог",
+    coordinates: { lat: 47.248, lon: 38.893 }
   },
   {
     id: "e15",
@@ -297,7 +304,8 @@ export const mockEvents: Event[] = [
     status: "active",
     paymentInfo: "Билеты от 750 ₽",
     userParticipating: false,
-    location: "Кинотеатр Пионер"
+    location: "Кинотеатр Пионер, Таганрог",
+    coordinates: { lat: 47.233, lon: 38.898 }
   }
 ];
 

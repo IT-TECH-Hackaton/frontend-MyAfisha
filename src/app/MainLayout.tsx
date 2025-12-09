@@ -6,6 +6,7 @@ import { Button } from "@shared/ui/button";
 import { ThemeToggle } from "@shared/ui/theme-toggle";
 import { LogoutButton } from "@modules/auth";
 import { MobileMenu } from "./MobileMenu";
+import { Footer } from "./Footer";
 
 export const MainLayout = () => {
   const isAuth = localStorage.getItem(AUTH_KEY) === "true";
@@ -64,6 +65,7 @@ export const MainLayout = () => {
       <main className='flex-1'>
         <Outlet />
       </main>
+      <Footer />
     </div>
   );
 };

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { MapPin } from "lucide-react";
 
 import type { Event } from "@modules/events/types/event";
@@ -6,7 +7,6 @@ import { cn } from "@shared/lib/utils";
 
 interface EventsMapProps {
   events: Event[];
-  onEventClick?: (event: Event) => void;
   className?: string;
 }
 
@@ -16,7 +16,8 @@ declare global {
   }
 }
 
-export const EventsMap = ({ events, onEventClick, className }: EventsMapProps) => {
+export const EventsMap = ({ events, className }: EventsMapProps) => {
+  const navigate = useNavigate();
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<any>(null);
   const placemarksRef = useRef<any[]>([]);
@@ -119,9 +120,7 @@ export const EventsMap = ({ events, onEventClick, className }: EventsMapProps) =
       );
 
       placemark.events.add("click", () => {
-        if (onEventClick) {
-          onEventClick(event);
-        }
+        navigate(`/events/${event.id}`);
       });
 
       mapInstanceRef.current.geoObjects.add(placemark);

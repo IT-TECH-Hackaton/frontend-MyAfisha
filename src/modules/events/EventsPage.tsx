@@ -5,11 +5,10 @@ import {
 } from "@modules/events/lib/events-data";
 import type { Event } from "@modules/events/types/event";
 import { EventCard } from "@modules/events/ui/EventCard";
-import { EventDetailsDialog } from "@modules/events/ui/EventDetailsDialog";
 import { EventsMap } from "@modules/events/ui/EventsMap";
-import { fetchEvents, isDateWithinEvent, updateEventStatuses } from "@modules/events/lib/events-data";
-import type { Event } from "@modules/events/types/event";
-import { Button } from "@shared/ui/button";
+import { CalendarDays, CalendarRange, ChevronLeft, ChevronRight } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+
 import { useToast } from "@shared/lib/hooks/use-toast";
 import { cn } from "@shared/lib/utils";
 import { Button } from "@shared/ui/button";
@@ -277,20 +276,10 @@ export const EventsPage = () => {
   return (
     <div className='container mx-auto px-4 py-8'>
       <div className='flex flex-col gap-6'>
-        <div className='flex flex-wrap items-center justify-between gap-4'>
-          <div>
-            <p className='text-sm text-muted-foreground'>Афиша событий</p>
-            <h1 className='text-3xl font-bold'>События</h1>
-          </div>
-          {navPanel}
+        <div>
+          <p className='text-sm text-muted-foreground'>Афиша событий</p>
+          <h1 className='text-3xl font-bold'>События</h1>
         </div>
-
-        {eventsForMap.length > 0 && (
-          <div className='rounded-xl border bg-card p-4 shadow-sm'>
-            <h2 className='mb-4 text-lg font-semibold'>Карта событий</h2>
-            <EventsMap events={eventsForMap} onEventClick={handleOpenDetails} />
-          </div>
-        )}
 
         {renderDateStrip()}
 
@@ -311,6 +300,13 @@ export const EventsPage = () => {
             )}
           </div>
         </div>
+
+        {eventsForMap.length > 0 && (
+          <div className='rounded-xl border bg-card p-4 shadow-sm'>
+            <h2 className='mb-4 text-lg font-semibold'>Карта событий</h2>
+            <EventsMap events={eventsForMap} />
+          </div>
+        )}
       </div>
     </div>
   );
