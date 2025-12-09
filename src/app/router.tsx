@@ -1,11 +1,12 @@
+import AdminPage from "@modules/admin/components/adminPage/AdminPage";
 import {
   AuthLayout,
-  SignInPage,
-  SignUpPage,
   EmailVerifyPage,
   ForgotPasswordPage,
+  OAuthCallbackPage,
   ResetPasswordPage,
-  OAuthCallbackPage
+  SignInPage,
+  SignUpPage
 } from "@modules/auth";
 import { ProfilePage } from "@modules/user/profile";
 import { createBrowserRouter } from "react-router-dom";
@@ -15,7 +16,7 @@ import { PATHS } from "@shared/constants";
 import { MainLayout } from "./MainLayout";
 import { NotFoundPage } from "./NotFoundPage";
 import { PrivateRoute } from "./PrivateRoute";
-import { RootPage } from "./RootPage";
+import RootPage from "./RootPage";
 
 export const routes = createBrowserRouter([
   {
@@ -67,7 +68,7 @@ export const routes = createBrowserRouter([
               },
               {
                 path: PATHS.ADMIN,
-                element: <div className='container mx-auto px-4 py-8'>Админ панель</div>
+                element: <AdminPage />
               }
             ]
           },
