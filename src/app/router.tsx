@@ -13,6 +13,7 @@ import { createBrowserRouter } from "react-router-dom";
 import { PATHS } from "@shared/constants";
 
 import { MainLayout } from "./MainLayout";
+import { NotFoundPage } from "./NotFoundPage";
 import { PrivateRoute } from "./PrivateRoute";
 import { RootPage } from "./RootPage";
 
@@ -46,30 +47,34 @@ export const routes = createBrowserRouter([
       }
     ]
   },
-  {
-    element: <MainLayout />,
-    children: [
       {
-        path: "/",
-        element: <RootPage />
-      },
-      {
-        element: <PrivateRoute />,
+        element: <MainLayout />,
         children: [
           {
-            path: PATHS.PROFILE,
-            element: <ProfilePage />
+            path: "/",
+            element: <RootPage />
           },
           {
-            path: PATHS.TICKETS,
-            element: <div className='container mx-auto px-4 py-8'>Мои билеты</div>
+            element: <PrivateRoute />,
+            children: [
+              {
+                path: PATHS.PROFILE,
+                element: <ProfilePage />
+              },
+              {
+                path: PATHS.TICKETS,
+                element: <div className='container mx-auto px-4 py-8'>Мои билеты</div>
+              },
+              {
+                path: PATHS.ADMIN,
+                element: <div className='container mx-auto px-4 py-8'>Админ панель</div>
+              }
+            ]
           },
           {
-            path: PATHS.ADMIN,
-            element: <div className='container mx-auto px-4 py-8'>Админ панель</div>
+            path: "*",
+            element: <NotFoundPage />
           }
         ]
       }
-    ]
-  }
 ]);

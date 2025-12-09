@@ -16,7 +16,7 @@ export const MainLayout = () => {
         <div className='container mx-auto flex h-16 items-center justify-between px-4'>
           <div className='flex items-center gap-6'>
             <Link to='/' className='flex items-center gap-2'>
-              <span className='text-2xl font-bold'>MyAfisha</span>
+              <span className='text-2xl font-bold'>myAfisha</span>
             </Link>
             {isAuth && (
               <nav className='hidden items-center gap-2 md:flex'>
