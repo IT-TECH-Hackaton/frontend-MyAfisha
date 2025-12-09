@@ -8,6 +8,7 @@ import {
   SignInPage,
   SignUpPage
 } from "@modules/auth";
+import { EventDetailsPage } from "@modules/events/EventDetailsPage";
 import { ProfilePage } from "@modules/user/profile";
 import { createBrowserRouter } from "react-router-dom";
 
@@ -48,34 +49,38 @@ export const routes = createBrowserRouter([
       }
     ]
   },
+  {
+    element: <MainLayout />,
+    children: [
       {
-        element: <MainLayout />,
+        path: "/",
+        element: <RootPage />
+      },
+      {
+        path: "/events/:id",
+        element: <EventDetailsPage />
+      },
+      {
+        element: <PrivateRoute />,
         children: [
           {
-            path: "/",
-            element: <RootPage />
+            path: PATHS.PROFILE,
+            element: <ProfilePage />
           },
           {
-            element: <PrivateRoute />,
-            children: [
-              {
-                path: PATHS.PROFILE,
-                element: <ProfilePage />
-              },
-              {
-                path: PATHS.TICKETS,
-                element: <div className='container mx-auto px-4 py-8'>Мои билеты</div>
-              },
-              {
-                path: PATHS.ADMIN,
-                element: <AdminPage />
-              }
-            ]
+            path: PATHS.TICKETS,
+            element: <div className='container mx-auto px-4 py-8'>Мои билеты</div>
           },
           {
-            path: "*",
-            element: <NotFoundPage />
+            path: PATHS.ADMIN,
+            element: <AdminPage />
           }
         ]
+      },
+      {
+        path: "*",
+        element: <NotFoundPage />
       }
+    ]
+  }
 ]);

@@ -1,9 +1,17 @@
-import { CalendarRange, Users } from "lucide-react";
-
 import { formatEventDateRange, getStatusLabel } from "@modules/events/lib/events-data";
 import type { Event } from "@modules/events/types/event";
-import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from "@shared/ui/card";
+import { CalendarRange, Users } from "lucide-react";
+import { Link } from "react-router-dom";
+
 import { Button } from "@shared/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle
+} from "@shared/ui/card";
 
 const statusStyles = {
   active: "bg-emerald-50 text-emerald-700 border-emerald-200",
@@ -13,10 +21,9 @@ const statusStyles = {
 
 interface EventCardProps {
   event: Event;
-  onOpen: (event: Event) => void;
 }
 
-export const EventCard = ({ event, onOpen }: EventCardProps) => (
+export const EventCard = ({ event }: EventCardProps) => (
   <Card
     className='group flex h-full flex-col overflow-hidden border bg-card shadow-sm transition hover:-translate-y-1 hover:shadow-md'
     title={event.shortDescription}
@@ -60,10 +67,9 @@ export const EventCard = ({ event, onOpen }: EventCardProps) => (
     </CardContent>
 
     <CardFooter>
-      <Button className='w-full' variant='secondary' onClick={() => onOpen(event)}>
-        Подробнее
+      <Button className='w-full' variant='secondary' asChild>
+        <Link to={`/events/${event.id}`}>Подробнее</Link>
       </Button>
     </CardFooter>
   </Card>
 );
-

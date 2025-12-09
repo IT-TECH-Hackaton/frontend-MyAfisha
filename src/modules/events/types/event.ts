@@ -16,4 +16,6 @@ export interface Event {
   location?: string;
 }
 
-
+export interface EventsApiError {
+  message?: string;
+}

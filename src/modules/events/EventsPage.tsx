@@ -1,16 +1,16 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
-import { CalendarDays, CalendarRange, Shield, Ticket, User } from "lucide-react";
-
-import { EventCard } from "@modules/events/ui/EventCard";
-import { EventDetailsDialog } from "@modules/events/ui/EventDetailsDialog";
-import { fetchEvents, isDateWithinEvent, updateEventStatuses } from "@modules/events/lib/events-data";
+import {
+  fetchEvents,
+  isDateWithinEvent,
+  updateEventStatuses
+} from "@modules/events/lib/events-data";
 import type { Event } from "@modules/events/types/event";
-import { Button } from "@shared/ui/button";
+import { EventCard } from "@modules/events/ui/EventCard";
+import { CalendarDays, CalendarRange, ChevronLeft, ChevronRight } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+
 import { useToast } from "@shared/lib/hooks/use-toast";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@shared/ui/dialog";
-import { PATHS } from "@shared/constants";
 import { cn } from "@shared/lib/utils";
+import { Button } from "@shared/ui/button";
 
 type EventTab = "my" | "active" | "past";
 
@@ -51,10 +51,8 @@ export const EventsPage = () => {
   const [events, setEvents] = useState<Event[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<EventTab>("my");
-  const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
-  const [cancelTarget, setCancelTarget] = useState<Event | null>(null);
-  const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
+  const stripRef = useRef<HTMLDivElement | null>(null);
 
   const dateStrip = useMemo(() => buildDateStrip(), []);
 
@@ -68,8 +66,9 @@ export const EventsPage = () => {
   );
 
   useEffect(() => {
+    setIsLoading(true);
     fetchEvents()
-      .then((data) => setEvents(data))
+      .then((data) => setEvents(updateEventStatuses(data)))
       .finally(() => setIsLoading(false));
   }, []);
 
@@ -77,14 +76,6 @@ export const EventsPage = () => {
     const timer = setInterval(applyStatusRefresh, 60 * 1000);
     return () => clearInterval(timer);
   }, [applyStatusRefresh]);
-
-  useEffect(() => {
-    if (!selectedEvent) return;
-    const updated = events.find((item) => item.id === selectedEvent.id);
-    if (updated && updated !== selectedEvent) {
-      setSelectedEvent(updated);
-    }
-  }, [events, selectedEvent]);
 
   const filteredEvents = useMemo(() => {
     const base = events
@@ -100,9 +91,6 @@ export const EventsPage = () => {
     if (!selectedDate) return byTab;
     return byTab.filter((event) => isDateWithinEvent(event, selectedDate));
   }, [events, activeTab, selectedDate]);
-
-  const handleOpenDetails = (event: Event) => setSelectedEvent(event);
-  const handleCloseDetails = () => setSelectedEvent(null);
 
   const handleConfirmParticipation = (eventId: string) => {
     setEvents((prev) =>
@@ -129,19 +117,10 @@ export const EventsPage = () => {
     });
   };
 
-  const handleCancelParticipation = (eventId: string) => {
-    const event = events.find((item) => item.id === eventId);
-    if (!event) return;
-    setCancelTarget(event);
-    setCancelDialogOpen(true);
-  };
-
   const confirmCancelParticipation = () => {
-    if (!cancelTarget) return;
-
     setEvents((prev) =>
       prev.map((event) =>
-        event.id === cancelTarget.id
+        event.id === ""
           ? {
               ...event,
               participantsCount: Math.max(0, event.participantsCount - 1),
@@ -151,39 +130,17 @@ export const EventsPage = () => {
       )
     );
 
-    setCancelDialogOpen(false);
-    setCancelTarget(null);
     toast({
       title: "Участие отменено",
       description: "Мы убрали событие из раздела «Мои события»"
     });
   };
 
-  const navItems = [
-    { label: "События", path: "/", icon: CalendarDays },
-    { label: "Профиль", path: PATHS.PROFILE, icon: User },
-    { label: "Билеты", path: PATHS.TICKETS, icon: Ticket },
-    { label: "Админ", path: PATHS.ADMIN, icon: Shield }
-  ];
-
-  const navPanel = (
-    <div className='flex flex-wrap gap-2'>
-      {navItems.map((item) => (
-        <Link
-          key={item.path}
-          to={item.path}
-          title={item.label}
-          className='group relative inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium text-foreground shadow-sm transition hover:-translate-y-0.5 hover:bg-accent hover:text-accent-foreground'
-        >
-          <item.icon className='h-4 w-4' />
-          <span className='hidden sm:inline'>{item.label}</span>
-          <span className='pointer-events-none absolute left-1/2 top-full mt-2 hidden -translate-x-1/2 whitespace-nowrap rounded-md bg-popover px-2 py-1 text-xs text-popover-foreground shadow-lg group-hover:block sm:group-hover:hidden'>
-            {item.label}
-          </span>
-        </Link>
-      ))}
-    </div>
-  );
+  const scrollStrip = (direction: "left" | "right") => {
+    if (!stripRef.current) return;
+    const delta = direction === "left" ? -240 : 240;
+    stripRef.current.scrollBy({ left: delta, behavior: "smooth" });
+  };
 
   const renderDateStrip = () => (
     <div className='rounded-xl border bg-card p-4 shadow-sm'>
@@ -192,40 +149,67 @@ export const EventsPage = () => {
           <CalendarRange className='h-4 w-4' />
           Афиша событий — выберите дату
         </div>
-        <Button variant='ghost' size='sm' onClick={() => setSelectedDate(null)} disabled={!selectedDate}>
-          Сбросить дату
-        </Button>
+        <div className='flex items-center gap-2'>
+          <Button variant='ghost' size='icon' onClick={() => scrollStrip("left")}>
+            <ChevronLeft className='h-4 w-4' />
+          </Button>
+          <Button variant='ghost' size='icon' onClick={() => scrollStrip("right")}>
+            <ChevronRight className='h-4 w-4' />
+          </Button>
+          <Button
+            variant='ghost'
+            size='sm'
+            onClick={() => setSelectedDate(null)}
+            disabled={!selectedDate}
+          >
+            Сбросить дату
+          </Button>
+        </div>
       </div>
-      <div className='mt-3 flex gap-2 overflow-x-auto pb-2'>
-        {dateStrip.map((date) => {
-          const active = isSameDay(date, selectedDate);
-          const weekday = date
-            .toLocaleDateString("ru-RU", { weekday: "short" })
-            .replace(".", "")
-            .toUpperCase();
-          const weekend = weekday === "СБ" || weekday === "ВС";
+      <div className='mt-3 flex items-center gap-3'>
+        <div className='relative w-full overflow-hidden'>
+          <div ref={stripRef} className='flex gap-2 overflow-x-auto pb-2 scrollbar-none'>
+            {dateStrip.map((date) => {
+              const active = isSameDay(date, selectedDate);
+              const weekday = date
+                .toLocaleDateString("ru-RU", { weekday: "short" })
+                .replace(".", "")
+                .toUpperCase();
+              const weekend = weekday === "СБ" || weekday === "ВС";
 
-          return (
-            <button
-              key={date.toISOString()}
-              type='button'
-              onClick={() => setSelectedDate(date)}
-              className={cn(
-                "flex min-w-[58px] flex-col items-center rounded-lg border px-3 py-2 text-center text-sm transition",
-                active
-                  ? "border-primary bg-primary text-primary-foreground shadow"
-                  : "bg-muted/40 hover:border-primary/40 hover:bg-muted"
-              )}
-            >
-              <span className={cn("text-lg font-semibold", weekend && !active && "text-destructive")}>
-                {date.getDate()}
-              </span>
-              <span className={cn("text-[11px] uppercase tracking-tight", weekend && !active && "text-destructive")}>
-                {weekday}
-              </span>
-            </button>
-          );
-        })}
+              return (
+                <button
+                  key={date.toISOString()}
+                  type='button'
+                  onClick={() => setSelectedDate(date)}
+                  className={cn(
+                    "flex min-w-[64px] flex-col items-center rounded-lg border px-3 py-2 text-center text-sm transition",
+                    active
+                      ? "border-primary bg-primary text-primary-foreground shadow"
+                      : "bg-muted/40 hover:border-primary/40 hover:bg-muted"
+                  )}
+                >
+                  <span
+                    className={cn(
+                      "text-lg font-semibold",
+                      weekend && !active && "text-destructive"
+                    )}
+                  >
+                    {date.getDate()}
+                  </span>
+                  <span
+                    className={cn(
+                      "text-[11px] uppercase tracking-tight",
+                      weekend && !active && "text-destructive"
+                    )}
+                  >
+                    {weekday}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -287,12 +271,9 @@ export const EventsPage = () => {
   return (
     <div className='container mx-auto px-4 py-8'>
       <div className='flex flex-col gap-6'>
-        <div className='flex flex-wrap items-center justify-between gap-4'>
-          <div>
-            <p className='text-sm text-muted-foreground'>Афиша событий</p>
-            <h1 className='text-3xl font-bold'>События</h1>
-          </div>
-          {navPanel}
+        <div>
+          <p className='text-sm text-muted-foreground'>Афиша событий</p>
+          <h1 className='text-3xl font-bold'>События</h1>
         </div>
 
         {renderDateStrip()}
@@ -306,7 +287,7 @@ export const EventsPage = () => {
             ) : filteredEvents.length ? (
               <div className='grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'>
                 {filteredEvents.map((event) => (
-                  <EventCard key={event.id} event={event} onOpen={handleOpenDetails} />
+                  <EventCard key={event.id} event={event} />
                 ))}
               </div>
             ) : (
@@ -315,42 +296,6 @@ export const EventsPage = () => {
           </div>
         </div>
       </div>
-
-      <EventDetailsDialog
-        event={selectedEvent}
-        open={Boolean(selectedEvent)}
-        onClose={handleCloseDetails}
-        onConfirm={handleConfirmParticipation}
-        onCancelRequest={handleCancelParticipation}
-      />
-
-      <Dialog
-        open={cancelDialogOpen}
-        onOpenChange={(next) => {
-          if (!next) {
-            setCancelDialogOpen(false);
-            setCancelTarget(null);
-          }
-        }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Отменить участие?</DialogTitle>
-            <DialogDescription>
-              Мы уберем вас из списка участников и перенесем событие из раздела «Мои события».
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className='flex flex-col gap-2 sm:flex-row sm:justify-end'>
-            <Button variant='outline' onClick={() => setCancelDialogOpen(false)}>
-              Оставить участие
-            </Button>
-            <Button variant='destructive' onClick={confirmCancelParticipation}>
-              Отменить участие
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 };
-
