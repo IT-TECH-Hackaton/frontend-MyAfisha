@@ -1,11 +1,12 @@
+import AdminPage from "@modules/admin/components/adminPage/AdminPage";
 import {
   AuthLayout,
-  SignInPage,
-  SignUpPage,
   EmailVerifyPage,
   ForgotPasswordPage,
+  OAuthCallbackPage,
   ResetPasswordPage,
-  OAuthCallbackPage
+  SignInPage,
+  SignUpPage
 } from "@modules/auth";
 import { ProfilePage } from "@modules/user/profile";
 import { createBrowserRouter } from "react-router-dom";
@@ -66,7 +67,7 @@ export const routes = createBrowserRouter([
           },
           {
             path: PATHS.ADMIN,
-            element: <div className='container mx-auto px-4 py-8'>Админ панель</div>
+            element: <AdminPage />
           }
         ]
       }
