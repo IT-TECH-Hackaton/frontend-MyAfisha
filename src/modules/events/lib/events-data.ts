@@ -67,14 +67,15 @@ export const mockEvents: Event[] = [
     status: "active",
     paymentInfo: "Вход свободный, мастер-классы от 800 ₽",
     userParticipating: false,
-    location: "Парк Горького"
+    location: "Парк Горького, Таганрог",
+    coordinates: { lat: 47.245, lon: 38.905 }
   },
   {
     id: "e2",
-    title: "Ночной забег по Москве",
+    title: "Ночной забег по Таганрогу",
     shortDescription: "5, 10 и 21 км по освещенным набережным.",
     description:
-      "Старт и финиш возле Лужников, трасса по набережным и центру. Хронометраж, медали финишеров, фото зона и горячий чай на финише.",
+      "Старт и финиш возле набережной, трасса по набережным и центру. Хронометраж, медали финишеров, фото зона и горячий чай на финише.",
     startDate: "2025-12-09T20:00:00",
     endDate: "2025-12-10T00:30:00",
     imageUrl: "/mad-max.jpg",
@@ -83,7 +84,8 @@ export const mockEvents: Event[] = [
     status: "active",
     paymentInfo: "Стартовый взнос 1500 ₽",
     userParticipating: true,
-    location: "Лужники"
+    location: "Набережная, Таганрог",
+    coordinates: { lat: 47.220, lon: 38.920 }
   },
   {
     id: "e3",
@@ -99,7 +101,8 @@ export const mockEvents: Event[] = [
     status: "past",
     paymentInfo: "Билеты от 1200 ₽",
     userParticipating: true,
-    location: "Зарядье"
+    location: "Драматический театр, Таганрог",
+    coordinates: { lat: 47.238, lon: 38.895 }
   },
   {
     id: "e4",
@@ -115,7 +118,8 @@ export const mockEvents: Event[] = [
     status: "active",
     paymentInfo: "Билеты от 900 ₽, есть льготы",
     userParticipating: false,
-    location: "ВДНХ, павильон 57"
+    location: "Центр культуры, Таганрог",
+    coordinates: { lat: 47.250, lon: 38.890 }
   },
   {
     id: "e5",
@@ -130,7 +134,8 @@ export const mockEvents: Event[] = [
     participantsLimit: 80,
     status: "active",
     userParticipating: false,
-    location: "Хлебозавод"
+    location: "Торговый центр, Таганрог",
+    coordinates: { lat: 47.230, lon: 38.910 }
   },
   {
     id: "e6",
@@ -145,7 +150,8 @@ export const mockEvents: Event[] = [
     participantsLimit: 30,
     status: "declined",
     userParticipating: false,
-    location: "Частный кинозал"
+    location: "Частный кинозал, Таганрог",
+    coordinates: { lat: 47.240, lon: 38.900 }
   }
 ];
 

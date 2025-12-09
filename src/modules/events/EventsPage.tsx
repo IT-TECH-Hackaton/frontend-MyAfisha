@@ -4,6 +4,7 @@ import { CalendarDays, CalendarRange, Shield, Ticket, User } from "lucide-react"
 
 import { EventCard } from "@modules/events/ui/EventCard";
 import { EventDetailsDialog } from "@modules/events/ui/EventDetailsDialog";
+import { EventsMap } from "@modules/events/ui/EventsMap";
 import { fetchEvents, isDateWithinEvent, updateEventStatuses } from "@modules/events/lib/events-data";
 import type { Event } from "@modules/events/types/event";
 import { Button } from "@shared/ui/button";
@@ -284,6 +285,10 @@ export const EventsPage = () => {
     </div>
   );
 
+  const eventsForMap = useMemo(() => {
+    return events.filter((event) => event.status !== "declined" && event.coordinates);
+  }, [events]);
+
   return (
     <div className='container mx-auto px-4 py-8'>
       <div className='flex flex-col gap-6'>
@@ -294,6 +299,13 @@ export const EventsPage = () => {
           </div>
           {navPanel}
         </div>
+
+        {eventsForMap.length > 0 && (
+          <div className='rounded-xl border bg-card p-4 shadow-sm'>
+            <h2 className='mb-4 text-lg font-semibold'>Карта событий</h2>
+            <EventsMap events={eventsForMap} onEventClick={handleOpenDetails} />
+          </div>
+        )}
 
         {renderDateStrip()}
 

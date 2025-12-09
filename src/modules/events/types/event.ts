@@ -14,6 +14,10 @@ export interface Event {
   paymentInfo?: string;
   userParticipating: boolean;
   location?: string;
+  coordinates?: {
+    lat: number;
+    lon: number;
+  };
 }
 
 

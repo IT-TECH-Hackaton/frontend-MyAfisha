@@ -29,7 +29,7 @@ export const MainLayout = () => {
                 <Button asChild variant='ghost' className='gap-2'>
                   <Link to={PATHS.TICKETS}>
                     <Ticket className='h-4 w-4' />
-                    Билеты
+                    Мои афиши
                   </Link>
                 </Button>
               </nav>

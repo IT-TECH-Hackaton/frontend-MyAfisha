@@ -50,7 +50,7 @@ export const MobileMenu = () => {
                   <Button asChild variant='ghost' className='w-full justify-start gap-2' onClick={closeMenu}>
                     <Link to={PATHS.TICKETS}>
                       <Ticket className='h-4 w-4' />
-                      Билеты
+                      Мои афиши
                     </Link>
                   </Button>
                   <div className='border-t pt-4'>
