@@ -1,7 +1,7 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import type { z } from "zod";
 
-import { AUTH_KEY, PATHS } from "@shared/constants";
+import { AUTH_KEY, PATHS, TOKEN_KEY } from "@shared/constants";
 import { toast } from "@shared/lib/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@shared/ui/card";
 
@@ -16,7 +16,11 @@ export const SignInPage = () => {
 
   const { mutateAsync, isPending } = usePostLoginMutation({
     options: {
-      onSuccess: () => {
+      onSuccess: (data) => {
+        const token = data?.data?.token;
+        if (token) {
+          localStorage.setItem(TOKEN_KEY, token);
+        }
         localStorage.setItem(AUTH_KEY, "true");
         navigate(location.state?.pathname || "/");
       },

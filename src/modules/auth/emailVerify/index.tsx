@@ -1,9 +1,10 @@
+import { useEffect, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { z } from "zod";
 
-import { PATHS } from "@shared/constants";
+import { AUTH_KEY, PATHS, TOKEN_KEY } from "@shared/constants";
 import { toast } from "@shared/lib/hooks/use-toast";
 import { Button } from "@shared/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@shared/ui/card";
@@ -17,10 +18,25 @@ const verifyEmailSchema = z.object({
   code: z.string().min(6, { message: "Код должен содержать 6 символов" }).max(6)
 });
 
+const RESEND_TIMER_KEY = "email_verify_resend_timer";
+
 export const EmailVerifyPage = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const email = location.state?.email || "";
+
+  const getInitialTimer = () => {
+    const savedEndTime = localStorage.getItem(RESEND_TIMER_KEY);
+    if (savedEndTime) {
+      const endTime = parseInt(savedEndTime, 10);
+      const now = Date.now();
+      const remaining = Math.max(0, Math.floor((endTime - now) / 1000));
+      return remaining;
+    }
+    return 0;
+  };
+
+  const [resendTimer, setResendTimer] = useState(getInitialTimer);
 
   const form = useForm<z.infer<typeof verifyEmailSchema>>({
     resolver: zodResolver(verifyEmailSchema),
@@ -29,9 +45,30 @@ export const EmailVerifyPage = () => {
     }
   });
 
+  useEffect(() => {
+    if (resendTimer > 0) {
+      const timer = setTimeout(() => {
+        setResendTimer((prev) => {
+          const newValue = prev - 1;
+          if (newValue <= 0) {
+            localStorage.removeItem(RESEND_TIMER_KEY);
+            return 0;
+          }
+          return newValue;
+        });
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [resendTimer]);
+
   const verifyMutation = usePostVerifyEmailMutation({
     options: {
-      onSuccess: () => {
+      onSuccess: (data: any) => {
+        const token = data?.data?.token;
+        if (token) {
+          localStorage.setItem(TOKEN_KEY, token);
+          localStorage.setItem(AUTH_KEY, "true");
+        }
         toast({
           title: "Почта подтверждена",
           description: "Регистрация завершена успешно. Вы можете войти в систему"
@@ -68,6 +105,9 @@ export const EmailVerifyPage = () => {
   const resendMutation = usePostResendCodeMutation({
     options: {
       onSuccess: () => {
+        const endTime = Date.now() + 60 * 1000;
+        localStorage.setItem(RESEND_TIMER_KEY, endTime.toString());
+        setResendTimer(60);
         toast({
           title: "Код отправлен",
           description: "Новый код подтверждения отправлен на вашу почту"
@@ -132,9 +172,9 @@ export const EmailVerifyPage = () => {
                   <FormLabel>Код подтверждения</FormLabel>
                   <FormControl>
                     <Input
-                      placeholder='Введите 6-значный код'
+                      placeholder='Проверочный код'
                       maxLength={6}
-                      className='text-center text-2xl tracking-widest'
+                      className='text-center tracking-widest'
                       {...field}
                     />
                   </FormControl>
@@ -143,7 +183,7 @@ export const EmailVerifyPage = () => {
               )}
             />
             <Button
-              disabled={verifyMutation.isPending || !form.formState.dirtyFields.code}
+              disabled={verifyMutation.isPending || form.watch("code")?.length !== 6}
               type='submit'
               className='w-full'
             >
@@ -152,14 +192,20 @@ export const EmailVerifyPage = () => {
           </form>
         </Form>
         <div className='mt-4 text-center text-sm'>
-          <Button
-            variant='link'
-            onClick={handleResendCode}
-            disabled={resendMutation.isPending}
-            className='text-sm'
-          >
-            Отправить код повторно
-          </Button>
+          {resendTimer > 0 ? (
+            <p className='text-sm text-muted-foreground/60'>
+              Повторная отправка кода будет доступна через {resendTimer} секунд
+            </p>
+          ) : (
+            <Button
+              variant='link'
+              onClick={handleResendCode}
+              disabled={resendMutation.isPending}
+              className='text-sm'
+            >
+              Отправить код повторно
+            </Button>
+          )}
         </div>
         <div className='mt-4 text-center text-sm'>
           <Link to={PATHS.SIGNIN} className='text-primary underline'>

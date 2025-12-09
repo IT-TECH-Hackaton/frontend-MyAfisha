@@ -29,7 +29,7 @@ export const SignUpPage = () => {
 
   const registerMutation = usePostRegisterMutation({
     options: {
-      onSuccess: (data) => {
+      onSuccess: () => {
         toast({
           title: "Регистрация успешна",
           description: "На вашу почту отправлено письмо с кодом подтверждения"
@@ -64,12 +64,13 @@ export const SignUpPage = () => {
   });
 
   const onSubmit = async (values: z.infer<typeof signUpSchema>) => {
-    const { fullName, email, password } = values;
+    const { fullName, email, password, confirmPassword } = values;
     await registerMutation.mutateAsync({
       params: {
         fullName,
         email,
-        password
+        password,
+        passwordConfirm: confirmPassword
       }
     });
   };

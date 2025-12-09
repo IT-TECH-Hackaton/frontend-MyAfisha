@@ -19,6 +19,8 @@ import { Input } from "@shared/ui/input";
 import { cn } from "@shared/lib/utils";
 
 import type { UserData } from "../../types";
+import { useUpdateProfileMutation } from "../../api/hooks/useUpdateProfileMutation";
+import { useUploadImageMutation } from "@shared/api/hooks/useUploadImageMutation";
 
 const editProfileSchema = z.object({
   firstName: z.string().min(1, { message: "Имя обязательно для заполнения" }),
@@ -47,11 +49,16 @@ export const EditProfileDialog = ({
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const updateProfileMutation = useUpdateProfileMutation();
+  const uploadImageMutation = useUploadImageMutation();
+
   const form = useForm<z.infer<typeof editProfileSchema>>({
     resolver: zodResolver(editProfileSchema),
     defaultValues: {
-      firstName: userData.firstName || "",
-      secondName: userData.secondName || "",
+      fullName:
+        userData.firstName && userData.secondName
+          ? `${userData.firstName} ${userData.secondName}`
+          : userData.firstName || "",
       phone: userData.phone || "",
       birthDate: userData.birthDate || ""
     }
@@ -95,18 +102,47 @@ export const EditProfileDialog = ({
   const onSubmit = async (values: z.infer<typeof editProfileSchema>) => {
     try {
       setIsUploadingAvatar(!!values.avatar);
-      await new Promise((resolve) => setTimeout(resolve, 500));
+
+      let imageUrl: string | undefined;
+
+      if (values.avatar) {
+        const uploadResult = await uploadImageMutation.mutateAsync({
+          params: { file: values.avatar }
+        });
+        imageUrl = uploadResult.data.url;
+      }
+
+      const updateData: { fullName?: string; phone?: string; birthDate?: string; imageURL?: string } = {};
+
+      if (values.fullName) {
+        updateData.fullName = values.fullName;
+      }
+      if (values.phone !== undefined) {
+        updateData.phone = values.phone;
+      }
+      if (values.birthDate) {
+        updateData.birthDate = values.birthDate;
+      }
+      if (imageUrl) {
+        updateData.imageURL = imageUrl;
+      }
+
+      await updateProfileMutation.mutateAsync({
+        params: updateData
+      });
+
       toast({
         title: "Профиль обновлен",
         description: "Изменения успешно сохранены"
       });
       onOpenChange(false);
       onSuccess?.();
-    } catch (error) {
+    } catch (error: any) {
+      const errorMessage = error?.response?.data?.message || "Не удалось обновить профиль";
       toast({
         className: "bg-red-800 text-white hover:bg-red-700",
         title: "Ошибка",
-        description: "Не удалось обновить профиль"
+        description: errorMessage
       });
     } finally {
       setIsUploadingAvatar(false);
@@ -161,25 +197,12 @@ export const EditProfileDialog = ({
             </div>
             <FormField
               control={form.control}
-              name='firstName'
+              name='fullName'
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Имя</FormLabel>
+                  <FormLabel>ФИО</FormLabel>
                   <FormControl>
-                    <Input placeholder='Введите имя' {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name='secondName'
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Фамилия</FormLabel>
-                  <FormControl>
-                    <Input placeholder='Введите фамилию' {...field} />
+                    <Input placeholder='Введите ФИО' {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

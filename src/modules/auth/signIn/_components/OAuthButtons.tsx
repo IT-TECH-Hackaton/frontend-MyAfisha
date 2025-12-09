@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Loader2 } from "lucide-react";
 
+import { PATHS } from "@shared/constants";
 import { Button } from "@shared/ui/button";
 import { toast } from "@shared/lib/hooks/use-toast";
 import { api } from "@shared/api/instance";
@@ -32,12 +33,28 @@ export const OAuthButtons = () => {
   const handleOAuthLogin = async (provider: OAuthProvider) => {
     try {
       setLoadingProvider(provider);
-      const callbackUrl = `${window.location.origin}/oauth/callback?provider=${provider}`;
-      const response = await api.get<{ url: string }>(`auth/oauth/${provider}/url`, {
-        params: { redirect_uri: callbackUrl }
-      });
-      if (response.data?.url) {
-        window.location.href = response.data.url;
+      if (provider === "yandex") {
+        const callbackUrl = `${window.location.origin}${PATHS.OAUTH_CALLBACK}`;
+        const response = await api.get<{ authUrl: string; state: string } | { fake: boolean; message: string }>(
+          "auth/yandex",
+          {
+            params: { redirect_uri: callbackUrl }
+          }
+        );
+        if ("authUrl" in response.data && response.data.authUrl) {
+          window.location.href = response.data.authUrl;
+        } else if ("fake" in response.data && response.data.fake) {
+          toast({
+            title: "Фейковый режим",
+            description: "Используйте POST /api/auth/yandex/fake для разработки"
+          });
+        }
+      } else if (provider === "vk") {
+        toast({
+          className: "bg-yellow-800 text-white hover:bg-yellow-700",
+          title: "В разработке",
+          description: "Авторизация через ВКонтакте пока не поддерживается"
+        });
       }
     } catch (error: any) {
       setLoadingProvider(null);

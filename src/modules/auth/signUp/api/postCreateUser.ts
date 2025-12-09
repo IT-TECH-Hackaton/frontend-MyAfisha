@@ -4,6 +4,7 @@ interface PostCreateUserParams {
   fullName: string;
   email: string;
   password: string;
+  passwordConfirm: string;
 }
 
 export type PostCreateUserConfig = RequestConfig<PostCreateUserParams>;

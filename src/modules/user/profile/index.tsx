@@ -9,12 +9,16 @@ import { LogoutButton } from "@modules/auth";
 
 import { useGetProfileQuery } from "../api/hooks/useGetProfileQuery";
 import { EditProfileDialog } from "./_components/EditProfileDialog";
+import { useUploadImageMutation } from "@shared/api/hooks/useUploadImageMutation";
+import { useUpdateProfileMutation } from "../api/hooks/useUpdateProfileMutation";
 
 export const ProfilePage = () => {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const uploadImageMutation = useUploadImageMutation();
+  const updateProfileMutation = useUpdateProfileMutation();
   const { data, isPending, refetch } = useGetProfileQuery({});
 
   if (isPending) {
@@ -28,9 +32,20 @@ export const ProfilePage = () => {
   }
 
   const userData = data?.data;
-  const fullName = userData?.firstName && userData?.secondName
-    ? `${userData.firstName} ${userData.secondName}`
-    : userData?.firstName || "Пользователь";
+  
+  console.log("Profile data:", data);
+  console.log("User data:", userData);
+  
+  const getFullName = () => {
+    if (userData?.fullName) return userData.fullName;
+    const firstName = userData?.firstName?.trim() || "";
+    const secondName = userData?.secondName?.trim() || "";
+    if (firstName && secondName) return `${firstName} ${secondName}`;
+    if (firstName) return firstName;
+    if (secondName) return secondName;
+    return "Пользователь";
+  };
+  const fullName = getFullName();
 
   const formatDate = (dateString?: string) => {
     if (!dateString) return "Не указана";
@@ -55,19 +70,25 @@ export const ProfilePage = () => {
   const handleAvatarUpload = async (file: File) => {
     try {
       setIsUploadingAvatar(true);
-      const formData = new FormData();
-      formData.append("avatar", file);
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      const uploadResult = await uploadImageMutation.mutateAsync({
+        params: { file }
+      });
+
+      await updateProfileMutation.mutateAsync({
+        params: { imageURL: uploadResult.data.url }
+      });
+
       toast({
         title: "Аватар обновлен",
         description: "Изображение профиля успешно загружено"
       });
       await refetch();
-    } catch (error) {
+    } catch (error: any) {
+      const errorMessage = error?.response?.data?.message || "Не удалось загрузить аватар";
       toast({
         className: "bg-red-800 text-white hover:bg-red-700",
         title: "Ошибка",
-        description: "Не удалось загрузить аватар"
+        description: errorMessage
       });
     } finally {
       setIsUploadingAvatar(false);
@@ -171,6 +192,15 @@ export const ProfilePage = () => {
             </div>
 
             <div className='space-y-4'>
+              {(userData?.fullName || (userData?.firstName?.trim() || userData?.secondName?.trim())) && (
+                <div className='flex items-center gap-3'>
+                  <UserIcon className='h-5 w-5 text-muted-foreground' />
+                  <div>
+                    <p className='text-sm font-medium'>ФИО</p>
+                    <p className='text-sm text-muted-foreground'>{fullName}</p>
+                  </div>
+                </div>
+              )}
               <div className='flex items-center gap-3'>
                 <Mail className='h-5 w-5 text-muted-foreground' />
                 <div>

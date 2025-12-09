@@ -1,41 +1,17 @@
 import { useEffect } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 
-import { AUTH_KEY, PATHS } from "@shared/constants";
+import { AUTH_KEY, PATHS, TOKEN_KEY } from "@shared/constants";
 import { toast } from "@shared/lib/hooks/use-toast";
 import { Card, CardContent } from "@shared/ui/card";
-import { usePostOAuthCallbackMutation } from "../signIn/api/usePostOAuthCallback";
 
 export const OAuthCallbackPage = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
 
-  const code = searchParams.get("code");
-  const state = searchParams.get("state");
+  const token = searchParams.get("token");
   const provider = searchParams.get("provider") as "yandex" | "vk" | null;
   const error = searchParams.get("error");
-
-  const callbackMutation = usePostOAuthCallbackMutation({
-    options: {
-      onSuccess: () => {
-        localStorage.setItem(AUTH_KEY, "true");
-        toast({
-          title: "Успешная авторизация",
-          description: "Вы успешно вошли через социальную сеть"
-        });
-        navigate("/");
-      },
-      onError(error: any) {
-        const errorMessage = error?.response?.data?.message || "Ошибка авторизации";
-        toast({
-          className: "bg-red-800 text-white hover:bg-red-700",
-          title: "Ошибка авторизации",
-          description: errorMessage
-        });
-        navigate(PATHS.SIGNIN);
-      }
-    }
-  });
 
   useEffect(() => {
     if (error) {
@@ -48,23 +24,23 @@ export const OAuthCallbackPage = () => {
       return;
     }
 
-    if (code && provider) {
-      callbackMutation.mutate({
-        params: {
-          provider,
-          code,
-          state: state || undefined
-        }
+    if (token) {
+      localStorage.setItem(TOKEN_KEY, token);
+      localStorage.setItem(AUTH_KEY, "true");
+      toast({
+        title: "Успешная авторизация",
+        description: `Вы успешно вошли через ${provider === "yandex" ? "Яндекс" : provider === "vk" ? "ВКонтакте" : "социальную сеть"}`
       });
+      navigate("/");
     } else {
       toast({
         className: "bg-red-800 text-white hover:bg-red-700",
         title: "Ошибка",
-        description: "Отсутствуют необходимые параметры для авторизации"
+        description: "Отсутствует токен авторизации"
       });
       navigate(PATHS.SIGNIN);
     }
-  }, [code, provider, state, error]);
+  }, [token, provider, error, navigate]);
 
   return (
     <div className='flex min-h-svh items-center justify-center'>
