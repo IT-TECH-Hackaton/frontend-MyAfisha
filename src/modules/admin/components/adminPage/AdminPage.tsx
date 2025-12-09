@@ -1,5 +1,7 @@
 import { useMemo, useState } from "react";
 
+import { YandexMapPicker } from "@shared/ui/yandex-map-picker";
+
 import "./AdminPage.css";
 
 type Role = "Admin" | "User";
@@ -97,7 +99,8 @@ function AdminPage() {
     title: "",
     startDate: "",
     endDate: "",
-    participantsCount: 0
+    participantsCount: 0,
+    location: null as { lat: number; lon: number; address?: string } | null
   });
 
   const handleFilterChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -133,7 +136,8 @@ function AdminPage() {
       title: event.title,
       startDate: event.startDate,
       endDate: event.endDate,
-      participantsCount: event.participantsCount
+      participantsCount: event.participantsCount,
+      location: null
     });
     setEditEventModalOpen(true);
   };
@@ -456,6 +460,18 @@ function AdminPage() {
                   <textarea className='form-input' placeholder='Реквизиты, сумма...'></textarea>
                 </div>
                 <div className='form-group full-width'>
+                  <label>Место проведения</label>
+                  <YandexMapPicker
+                    onLocationSelect={(coordinates: { lat: number; lon: number }, address?: string) => {
+                      setEventForm((prev) => ({
+                        ...prev,
+                        location: { ...coordinates, address }
+                      }));
+                    }}
+                    className='mt-2'
+                  />
+                </div>
+                <div className='form-group full-width'>
                   <label>Участники (multiselect)</label>
                   <select multiple className='form-select' style={{ height: "100px" }}>
                     <option>Иванов И.И.</option>
@@ -469,7 +485,16 @@ function AdminPage() {
               <button className='btn' onClick={() => setEventModalOpen(false)}>
                 Отмена
               </button>
-              <button className='btn btn-primary'>Создать</button>
+              <button
+                className='btn btn-primary'
+                onClick={() => {
+                  console.log("Адрес события:", eventForm.location?.address);
+                  console.log("Координаты события:", eventForm.location);
+                  console.log("Полная форма события:", eventForm);
+                }}
+              >
+                Создать
+              </button>
             </div>
           </div>
         </div>

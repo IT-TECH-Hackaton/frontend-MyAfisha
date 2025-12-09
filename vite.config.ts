@@ -12,5 +12,5 @@ export default defineConfig({
       "@shared": path.resolve(__dirname, "./src/shared")
     }
   },
-  envPrefix: ["VITE_", "BASE_"]
+  envPrefix: ["VITE_", "BASE_", "YANDEX_"]
 });
