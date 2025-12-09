@@ -2,12 +2,14 @@ import { mapEventResponseToEvent } from "@modules/events/lib/mapEventResponse";
 import { useGetEventsQuery } from "@modules/events/api/hooks/useGetEventsQuery";
 import { EventCard } from "@modules/events/ui/EventCard";
 import { EventsMap } from "@modules/events/ui/EventsMap";
-import { CalendarDays, CalendarRange, ChevronLeft, ChevronRight, Search } from "lucide-react";
+import { updateEventStatuses } from "@modules/events/lib/events-data";
+import { CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
 import { useMemo, useRef, useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 
+import { AUTH_KEY } from "@shared/constants";
 import { cn } from "@shared/lib/utils";
 import { Button } from "@shared/ui/button";
-import { Input } from "@shared/ui/input";
 
 type EventTab = "my" | "active" | "past";
 
@@ -23,14 +25,16 @@ const emptyMessages: Record<EventTab, string> = {
   past: "Нет прошедших событий"
 };
 
-const buildDateStrip = (days = 24) => {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+const buildDateStrip = (startDate: Date, days: number) => {
   return Array.from({ length: days }, (_, index) => {
-    const nextDate = new Date(today);
-    nextDate.setDate(today.getDate() + index);
+    const nextDate = new Date(startDate);
+    nextDate.setDate(startDate.getDate() + index);
     return nextDate;
   });
+};
+
+const getMonthNameShort = (date: Date) => {
+  return date.toLocaleDateString("ru-RU", { month: "long" }).toUpperCase();
 };
 
 const isSameDay = (left: Date | null, right: Date | null) => {
@@ -43,39 +47,30 @@ const isSameDay = (left: Date | null, right: Date | null) => {
 };
 
 export const EventsPage = () => {
-  const [activeTab, setActiveTab] = useState<EventTab>("my");
+  const [searchParams] = useSearchParams();
+  const isAuth = localStorage.getItem(AUTH_KEY) === "true";
+  const [activeTab, setActiveTab] = useState<EventTab>(isAuth ? "my" : "active");
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
-  const [searchQuery, setSearchQuery] = useState("");
+  const searchQuery = searchParams.get("search") || "";
   const [sortBy, setSortBy] = useState<"startDate" | "participantsCount">("startDate");
   const [sortOrder, setSortOrder] = useState<"ASC" | "DESC">("ASC");
   const [page, setPage] = useState(1);
   const [limit] = useState(12);
   const stripRef = useRef<HTMLDivElement | null>(null);
-  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  const dateStrip = useMemo(() => buildDateStrip(), []);
+  const observerRef = useRef<HTMLDivElement | null>(null);
+  const [dateStrip, setDateStrip] = useState<Date[]>(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return buildDateStrip(today, 60);
+  });
 
   useEffect(() => {
     setPage(1);
-  }, [activeTab, selectedDate, sortBy, sortOrder]);
-
-  useEffect(() => {
-    if (searchTimeoutRef.current) {
-      clearTimeout(searchTimeoutRef.current);
-    }
-    searchTimeoutRef.current = setTimeout(() => {
-      setPage(1);
-    }, 500);
-    return () => {
-      if (searchTimeoutRef.current) {
-        clearTimeout(searchTimeoutRef.current);
-      }
-    };
-  }, [searchQuery]);
+  }, [activeTab, selectedDate, sortBy, sortOrder, searchQuery]);
 
   const { data: eventsData, isLoading, error: eventsError } = useGetEventsQuery({
     params: {
-      tab: activeTab === "my" ? "my" : activeTab === "active" ? "active" : "past",
+      tab: activeTab === "my" ? "my" : activeTab === "active" ? "active" : activeTab === "past" ? "past" : "active",
       dateFrom: selectedDate ? selectedDate.toISOString().split("T")[0] : undefined,
       dateTo: selectedDate ? selectedDate.toISOString().split("T")[0] : undefined,
       search: searchQuery || undefined,
@@ -91,13 +86,42 @@ export const EventsPage = () => {
   });
 
   const events = useMemo(() => {
-    if (!eventsData?.data?.data) return [];
-    return eventsData.data.data.map(mapEventResponseToEvent);
+    const responseData = eventsData?.data;
+    if (!responseData) return [];
+    
+    const eventsArray = (responseData as any).data || (responseData as any).Data || [];
+    if (!Array.isArray(eventsArray)) return [];
+    
+    const mappedEvents = eventsArray.map(mapEventResponseToEvent);
+    return updateEventStatuses(mappedEvents);
   }, [eventsData]);
 
-  const eventsPagination = eventsData?.data?.pagination;
+  const eventsPagination = (eventsData?.data as any)?.pagination || (eventsData?.data as any)?.Pagination;
 
   const filteredEvents = events;
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          const lastDate = dateStrip[dateStrip.length - 1];
+          const newDates = buildDateStrip(new Date(lastDate.getTime() + 24 * 60 * 60 * 1000), 30);
+          setDateStrip((prev) => [...prev, ...newDates]);
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    if (observerRef.current) {
+      observer.observe(observerRef.current);
+    }
+
+    return () => {
+      if (observerRef.current) {
+        observer.unobserve(observerRef.current);
+      }
+    };
+  }, [dateStrip]);
 
   const scrollStrip = (direction: "left" | "right") => {
     if (!stripRef.current) return;
@@ -105,147 +129,127 @@ export const EventsPage = () => {
     stripRef.current.scrollBy({ left: delta, behavior: "smooth" });
   };
 
-  const renderDateStrip = () => (
-    <div className='rounded-xl border bg-card p-4 shadow-sm'>
-      <div className='flex items-center justify-between gap-3'>
-        <div className='flex items-center gap-2 text-sm font-medium text-foreground'>
-          <CalendarRange className='h-4 w-4' />
-          Афиша событий — выберите дату
+  const renderDateStrip = () => {
+    return (
+      <div>
+        <div className='mb-2 flex items-center justify-end'>
+          <div className='flex items-center gap-2'>
+            <Button variant='ghost' size='icon' onClick={() => scrollStrip("left")}>
+              <ChevronLeft className='h-4 w-4' />
+            </Button>
+            <Button variant='ghost' size='icon' onClick={() => scrollStrip("right")}>
+              <ChevronRight className='h-4 w-4' />
+            </Button>
+          </div>
         </div>
-        <div className='flex items-center gap-2'>
-          <Button variant='ghost' size='icon' onClick={() => scrollStrip("left")}>
-            <ChevronLeft className='h-4 w-4' />
-          </Button>
-          <Button variant='ghost' size='icon' onClick={() => scrollStrip("right")}>
-            <ChevronRight className='h-4 w-4' />
-          </Button>
-          <Button
-            variant='ghost'
-            size='sm'
-            onClick={() => setSelectedDate(null)}
-            disabled={!selectedDate}
-          >
-            Сбросить дату
-          </Button>
-        </div>
-      </div>
-      <div className='mt-3 flex items-center gap-3'>
         <div className='relative w-full overflow-hidden'>
-          <div ref={stripRef} className='flex gap-2 overflow-x-auto pb-2 scrollbar-none'>
-            {dateStrip.map((date) => {
+          <div ref={stripRef} className='flex gap-2 overflow-hidden pb-2'>
+            {dateStrip.map((date, index) => {
               const active = isSameDay(date, selectedDate);
               const weekday = date
                 .toLocaleDateString("ru-RU", { weekday: "short" })
                 .replace(".", "")
                 .toUpperCase();
               const weekend = weekday === "СБ" || weekday === "ВС";
+              const isFirstOfMonth = date.getDate() === 1;
+              const prevDate = index > 0 ? dateStrip[index - 1] : null;
+              const showMonthLabel = isFirstOfMonth && prevDate && prevDate.getMonth() !== date.getMonth();
 
               return (
-                <button
-                  key={date.toISOString()}
-                  type='button'
-                  onClick={() => setSelectedDate(date)}
-                  className={cn(
-                    "flex min-w-[64px] flex-col items-center rounded-lg border px-3 py-2 text-center text-sm transition",
-                    active
-                      ? "border-primary bg-primary text-primary-foreground shadow"
-                      : "bg-muted/40 hover:border-primary/40 hover:bg-muted"
+                <div key={date.toISOString()} className='flex items-center gap-2'>
+                  {showMonthLabel && (
+                    <div className='text-xs font-medium text-muted-foreground whitespace-nowrap'>
+                      {getMonthNameShort(date)} {date.getFullYear()}
+                    </div>
                   )}
-                >
-                  <span
+                  <button
+                    type='button'
+                    onClick={() => setSelectedDate(date)}
                     className={cn(
-                      "text-lg font-semibold",
-                      weekend && !active && "text-destructive"
+                      "flex min-w-[64px] flex-col items-center rounded-lg px-3 py-2 text-center text-sm transition",
+                      active
+                        ? "bg-primary text-primary-foreground shadow"
+                        : "bg-muted/40 hover:bg-muted"
                     )}
                   >
-                    {date.getDate()}
-                  </span>
-                  <span
-                    className={cn(
-                      "text-[11px] uppercase tracking-tight",
-                      weekend && !active && "text-destructive"
-                    )}
-                  >
-                    {weekday}
-                  </span>
-                </button>
+                    <span
+                      className={cn(
+                        "text-3xl font-semibold",
+                        weekend && !active && "text-destructive"
+                      )}
+                    >
+                      {date.getDate()}
+                    </span>
+                    <span
+                      className={cn(
+                        "text-[11px] uppercase tracking-tight",
+                        weekend && !active && "text-destructive"
+                      )}
+                    >
+                      {weekday}
+                    </span>
+                  </button>
+                </div>
               );
             })}
+            <div ref={observerRef} className='min-w-[1px]' />
           </div>
         </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   const renderFilters = () => (
-    <div className='mb-4 flex flex-col gap-4 rounded-xl border bg-card p-4 shadow-sm sm:flex-row sm:items-center'>
-      <div className='relative flex-1'>
-        <Search className='absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground' />
-        <Input
-          type='text'
-          placeholder='Поиск по названию или описанию...'
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className='pl-9'
-        />
-      </div>
-      <div className='flex items-center gap-2'>
-        <select
-          value={`${sortBy}-${sortOrder}`}
-          onChange={(e) => {
-            const [by, order] = e.target.value.split("-") as [typeof sortBy, typeof sortOrder];
-            setSortBy(by);
-            setSortOrder(order);
-            setPage(1);
-          }}
-          className='h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
-        >
-          <option value='startDate-ASC'>Дата: сначала ранние</option>
-          <option value='startDate-DESC'>Дата: сначала поздние</option>
-          <option value='participantsCount-DESC'>Участников: больше</option>
-          <option value='participantsCount-ASC'>Участников: меньше</option>
-        </select>
-      </div>
-    </div>
-  );
-
-  const renderTabs = () => (
-    <div className='flex flex-wrap items-center justify-between gap-3'>
-      <div className='flex flex-wrap gap-2'>
-        {(Object.keys(tabConfig) as EventTab[]).map((tabKey) => {
-          const tab = tabConfig[tabKey];
-          const isActive = tabKey === activeTab;
-          return (
-            <button
-              key={tabKey}
-              type='button'
-              onClick={() => {
-                setActiveTab(tabKey);
-                setPage(1);
-              }}
-              className={cn(
-                "rounded-lg border px-4 py-2 text-left shadow-sm transition",
-                isActive
-                  ? "border-primary bg-primary text-primary-foreground"
-                  : "bg-muted/40 text-foreground hover:border-primary/50 hover:bg-muted"
-              )}
-            >
-              <div className='text-sm font-semibold'>{tab.label}</div>
-              <div className='text-xs opacity-80'>{tab.subtitle}</div>
-            </button>
-          );
-        })}
+    <div className='mb-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between'>
+      <div className='flex flex-wrap items-center gap-3'>
+        <div className='flex items-center gap-2'>
+          <select
+            value={`${sortBy}-${sortOrder}`}
+            onChange={(e) => {
+              const [by, order] = e.target.value.split("-") as [typeof sortBy, typeof sortOrder];
+              setSortBy(by);
+              setSortOrder(order);
+              setPage(1);
+            }}
+            className='h-10 rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
+          >
+            <option value='startDate-ASC'>Дата: сначала ранние</option>
+            <option value='startDate-DESC'>Дата: сначала поздние</option>
+            <option value='participantsCount-DESC'>Участников: больше</option>
+            <option value='participantsCount-ASC'>Участников: меньше</option>
+          </select>
+        </div>
+        <div className='flex flex-wrap gap-2'>
+          {(Object.keys(tabConfig) as EventTab[]).map((tabKey) => {
+            const tab = tabConfig[tabKey];
+            const isActive = tabKey === activeTab;
+            return (
+              <button
+                key={tabKey}
+                type='button'
+                onClick={() => {
+                  setActiveTab(tabKey);
+                  setPage(1);
+                }}
+                className={cn(
+                  "rounded-lg border px-4 py-2 text-base font-medium transition",
+                  isActive
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "bg-muted/40 text-foreground hover:border-primary/50 hover:bg-muted"
+                )}
+              >
+                {tabKey === "my" ? "Мои" : tabKey === "active" ? "Активные" : "Прошедшие"}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
-      <div className='text-sm text-muted-foreground'>
-        {eventsPagination ? (
+      <div className='text-base text-muted-foreground'>
+        {eventsPagination && (
           <>
-            Показано {filteredEvents.length} из {eventsPagination.total} событи
-            {eventsPagination.total === 1 ? "я" : "й"}
-          </>
-        ) : (
-          <>
-            {filteredEvents.length} событи{filteredEvents.length === 1 ? "е" : "я"}
+            {eventsPagination.total} событи
+            {eventsPagination.total === 1 ? "е" : "й"}
           </>
         )}
       </div>
@@ -289,9 +293,8 @@ export const EventsPage = () => {
 
         {renderDateStrip()}
 
-        <div className='rounded-xl border bg-card p-4 shadow-sm'>
+        <div>
           {renderFilters()}
-          {renderTabs()}
 
           <div className='mt-6'>
             {isLoading ? (
@@ -324,35 +327,35 @@ export const EventsPage = () => {
           </div>
         </div>
 
-            {eventsPagination && eventsPagination.totalPages > 1 && (
-              <div className='mt-6 flex items-center justify-center gap-4'>
-                <Button
-                  variant='outline'
-                  onClick={() => setPage((prev) => Math.max(1, prev - 1))}
-                  disabled={page === 1 || isLoading}
-                >
-                  Назад
-                </Button>
-                <span className='text-sm text-muted-foreground'>
-                  Страница {eventsPagination.page} из {eventsPagination.totalPages}
-                </span>
-                <Button
-                  variant='outline'
-                  onClick={() => setPage((prev) => Math.min(eventsPagination.totalPages, prev + 1))}
-                  disabled={page === eventsPagination.totalPages || isLoading}
-                >
-                  Вперед
-                </Button>
-              </div>
-            )}
+        {eventsPagination && eventsPagination.totalPages > 1 && (
+          <div className='mt-6 flex items-center justify-center gap-4'>
+            <Button
+              variant='outline'
+              onClick={() => setPage((prev) => Math.max(1, prev - 1))}
+              disabled={page === 1 || isLoading}
+            >
+              Назад
+            </Button>
+            <span className='text-sm text-muted-foreground'>
+              Страница {eventsPagination.page} из {eventsPagination.totalPages}
+            </span>
+            <Button
+              variant='outline'
+              onClick={() => setPage((prev) => Math.min(eventsPagination.totalPages, prev + 1))}
+              disabled={page === eventsPagination.totalPages || isLoading}
+            >
+              Вперед
+            </Button>
+          </div>
+        )}
 
             {eventsForMap.length > 0 && (
-              <div className='rounded-xl border bg-card p-4 shadow-sm'>
+              <div className='p-4'>
                 <h2 className='mb-4 text-lg font-semibold'>Карта событий</h2>
                 <EventsMap events={eventsForMap} />
               </div>
             )}
-          </div>
-        </div>
-      );
-    };
+      </div>
+    </div>
+  );
+};

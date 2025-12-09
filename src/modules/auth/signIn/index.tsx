@@ -17,27 +17,30 @@ export const SignInPage = () => {
   const { mutateAsync, isPending } = usePostLoginMutation({
     options: {
       onSuccess: (data) => {
-        const token = data?.data?.token;
+        const token = data?.data?.token || data?.data?.data?.token || data?.token;
         if (token) {
           localStorage.setItem(TOKEN_KEY, token);
-        }
-        localStorage.setItem(AUTH_KEY, "true");
-        navigate(location.state?.pathname || "/");
-      },
-      onError(error) {
-        if (error?.response?.data?.message) {
-          toast({
-            className: "bg-red-800 text-white hover:bg-red-700",
-            title: "Ошибка авторизации",
-            description: `${error.response.data.message}`
-          });
+          localStorage.setItem(AUTH_KEY, "true");
+          navigate(location.state?.pathname || "/");
         } else {
           toast({
             className: "bg-red-800 text-white hover:bg-red-700",
-            title: "Неверные данные",
-            description: "Проверьте правильность введенных данных"
+            title: "Ошибка авторизации",
+            description: "Токен не получен от сервера"
           });
         }
+      },
+      onError(error: any) {
+        const errorMessage = error?.response?.data?.message || 
+                           error?.response?.data?.error || 
+                           error?.message ||
+                           "Неверные данные для входа";
+        toast({
+          className: "bg-red-800 text-white hover:bg-red-700",
+          title: "Ошибка авторизации",
+          description: errorMessage
+        });
+        console.error("Login error:", error);
       }
     }
   });

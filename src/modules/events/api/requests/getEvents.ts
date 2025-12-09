@@ -56,14 +56,16 @@ export interface EventsPagination {
 }
 
 export interface GetEventsResponse {
-  data: EventResponse[];
-  pagination: EventsPagination;
+  data?: EventResponse[];
+  Data?: EventResponse[];
+  pagination?: EventsPagination;
+  Pagination?: EventsPagination;
 }
 
 export type GetEventsConfig = RequestConfig<GetEventsParams>;
 
 export const getEvents = async ({ params, config }: GetEventsConfig) => {
-  const queryParams: Record<string, string | number> = {};
+  const queryParams: Record<string, string | number | string[]> = {};
   
   if (params?.tab) queryParams.tab = params.tab;
   if (params?.page) queryParams.page = params.page;
@@ -75,15 +77,11 @@ export const getEvents = async ({ params, config }: GetEventsConfig) => {
   if (params?.sortOrder) queryParams.sortOrder = params.sortOrder;
   
   if (params?.categoryIDs && params.categoryIDs.length > 0) {
-    params.categoryIDs.forEach((id) => {
-      queryParams[`categoryIDs`] = id;
-    });
+    queryParams.categoryIDs = params.categoryIDs;
   }
   
   if (params?.tags && params.tags.length > 0) {
-    params.tags.forEach((tag) => {
-      queryParams[`tags`] = tag;
-    });
+    queryParams.tags = params.tags;
   }
 
   return api.get<GetEventsResponse>("events", {

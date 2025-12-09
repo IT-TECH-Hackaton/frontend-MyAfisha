@@ -23,7 +23,22 @@ export const EventsMap = ({ events, className }: EventsMapProps) => {
   const placemarksRef = useRef<any[]>([]);
   const [mapLoaded, setMapLoaded] = useState(false);
 
-  const eventsWithCoordinates = events.filter((event) => event.coordinates && event.status !== "declined");
+  const eventsWithCoordinates = events.filter((event) => {
+    if (event.status === "declined") return false;
+    if (!event.coordinates) return false;
+    const lat = event.coordinates.lat;
+    const lon = event.coordinates.lon;
+    return (
+      typeof lat === "number" &&
+      typeof lon === "number" &&
+      !isNaN(lat) &&
+      !isNaN(lon) &&
+      lat >= -90 &&
+      lat <= 90 &&
+      lon >= -180 &&
+      lon <= 180
+    );
+  });
 
   useEffect(() => {
     if (!window.ymaps) {
@@ -89,6 +104,17 @@ export const EventsMap = ({ events, className }: EventsMapProps) => {
 
     eventsWithCoordinates.forEach((event) => {
       if (!event.coordinates) return;
+      
+      const lat = event.coordinates.lat;
+      const lon = event.coordinates.lon;
+      
+      if (typeof lat !== "number" || typeof lon !== "number" || isNaN(lat) || isNaN(lon)) {
+        return;
+      }
+      
+      if (lat < -90 || lat > 90 || lon < -180 || lon > 180) {
+        return;
+      }
 
       const statusColors: Record<string, string> = {
         active: "#10b981",
@@ -99,7 +125,7 @@ export const EventsMap = ({ events, className }: EventsMapProps) => {
       const color = statusColors[event.status] || "#3b82f6";
 
       const placemark = new window.ymaps.Placemark(
-        [event.coordinates.lat, event.coordinates.lon],
+        [lat, lon],
         {
           balloonContentHeader: `<strong>${event.title}</strong>`,
           balloonContentBody: `
@@ -129,14 +155,29 @@ export const EventsMap = ({ events, className }: EventsMapProps) => {
 
     if (eventsWithCoordinates.length > 0) {
       const bounds = eventsWithCoordinates
-        .map((event) => [event.coordinates!.lat, event.coordinates!.lon])
-        .filter((coords) => coords[0] && coords[1]);
+        .map((event) => {
+          if (!event.coordinates) return null;
+          const lat = event.coordinates.lat;
+          const lon = event.coordinates.lon;
+          if (typeof lat !== "number" || typeof lon !== "number" || isNaN(lat) || isNaN(lon)) {
+            return null;
+          }
+          if (lat < -90 || lat > 90 || lon < -180 || lon > 180) {
+            return null;
+          }
+          return [lat, lon];
+        })
+        .filter((coords): coords is [number, number] => coords !== null && Array.isArray(coords) && coords.length === 2);
 
       if (bounds.length > 0) {
-        mapInstanceRef.current.setBounds(bounds, {
-          checkZoomRange: true,
-          duration: 300
-        });
+        try {
+          mapInstanceRef.current.setBounds(bounds, {
+            checkZoomRange: true,
+            duration: 300
+          });
+        } catch (error) {
+          console.error("Ошибка при установке границ карты:", error);
+        }
       }
     }
   };

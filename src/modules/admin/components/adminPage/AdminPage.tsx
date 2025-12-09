@@ -178,7 +178,11 @@ function AdminPage() {
     }
   });
 
-  const events = eventsData?.data || [];
+  const events = Array.isArray(eventsData?.data?.data) 
+    ? eventsData.data.data 
+    : Array.isArray(eventsData?.data) 
+    ? eventsData.data 
+    : [];
 
   const [isEventModalOpen, setEventModalOpen] = useState(false);
   const [isEditUserModalOpen, setEditUserModalOpen] = useState(false);

@@ -1,17 +1,9 @@
 import axios from "axios";
 
-import { TOKEN_KEY } from "@shared/constants";
-
-const getBaseURL = () => {
-  const baseURL = import.meta.env.BASE_API_URL || import.meta.env.VITE_BASE_API_URL;
-  if (baseURL) {
-    return baseURL.endsWith("/") ? baseURL.slice(0, -1) : baseURL;
-  }
-  return "http://localhost:8081";
-};
+import { TOKEN_KEY, PATHS, AUTH_KEY } from "@shared/constants";
 
 export const api = axios.create({
-  baseURL: getBaseURL(),
+  baseURL: import.meta.env.BASE_API_URL,
   withCredentials: true
 });
 
@@ -32,10 +24,15 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error?.response?.status === 401) {
-      localStorage.removeItem(TOKEN_KEY);
-      localStorage.removeItem("is-auth");
-      if (window.location.pathname !== "/signin") {
-        window.location.href = "/signin";
+      const requestUrl = error?.config?.url || "";
+      const isPublicEndpoint = requestUrl.includes("/events/") && error?.config?.method?.toLowerCase() === "get";
+      
+      if (!isPublicEndpoint) {
+        localStorage.removeItem(TOKEN_KEY);
+        localStorage.removeItem(AUTH_KEY);
+        if (window.location.pathname !== PATHS.SIGNIN && !window.location.pathname.startsWith("/events/")) {
+          window.location.href = PATHS.SIGNIN;
+        }
       }
     }
 
