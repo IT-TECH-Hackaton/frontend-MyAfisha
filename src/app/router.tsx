@@ -15,7 +15,7 @@ import { PATHS } from "@shared/constants";
 
 import { MainLayout } from "./MainLayout";
 import { PrivateRoute } from "./PrivateRoute";
-import { RootPage } from "./RootPage";
+import RootPage from "./RootPage";
 
 export const routes = createBrowserRouter([
   {
