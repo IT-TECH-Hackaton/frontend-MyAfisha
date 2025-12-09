@@ -1,4 +1,5 @@
 import { useNavigate } from "react-router-dom";
+import { LogOut } from "lucide-react";
 
 import { AUTH_KEY, PATHS } from "@shared/constants";
 import { Button } from "@shared/ui/button";
@@ -17,5 +18,10 @@ export const LogoutButton = () => {
     }
   });
 
-  return <Button onClick={() => mutate({})}>Выйти</Button>;
+  return (
+    <Button onClick={() => mutate({})} variant='ghost' className='gap-2'>
+      <LogOut className='h-4 w-4' />
+      Выйти
+    </Button>
+  );
 };
