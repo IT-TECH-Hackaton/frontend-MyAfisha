@@ -9,4 +9,5 @@ export interface UserData {
   birthDate?: string;
   image?: Image;
   role: string;
+  interests?: Array<{ id: string; name: string }>;
 }

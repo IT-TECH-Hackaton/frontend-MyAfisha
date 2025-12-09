@@ -3,8 +3,10 @@ import { api } from "@shared/api/instance";
 interface UpdateProfileParams {
   fullName?: string;
   phone?: string;
+  tag?: string;
   birthDate?: string;
   imageURL?: string;
+  interestIds?: string[];
 }
 
 export type UpdateProfileConfig = RequestConfig<UpdateProfileParams>;

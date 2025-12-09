@@ -1,11 +1,12 @@
-import {
-  fetchEventById,
-  formatEventDateRange,
-  getStatusLabel
-} from "@modules/events/lib/events-data";
-import type { Event } from "@modules/events/types/event";
-import { ArrowLeft, CalendarRange, MapPin, Users, Wallet } from "lucide-react";
-import { useEffect, useState } from "react";
+import { formatEventDateRange, getStatusLabel } from "@modules/events/lib/events-data";
+import { mapEventResponseToEvent } from "@modules/events/lib/mapEventResponse";
+import { useGetEventByIdQuery } from "@modules/events/api/hooks/useGetEventByIdQuery";
+import { useJoinEventMutation } from "@modules/events/api/hooks/useJoinEventMutation";
+import { useLeaveEventMutation } from "@modules/events/api/hooks/useLeaveEventMutation";
+import { useExportParticipantsMutation } from "@modules/events/api/hooks/useExportParticipantsMutation";
+import { useGetProfileQuery } from "@modules/user/api/hooks/useGetProfileQuery";
+import { ArrowLeft, CalendarRange, MapPin, Users, Wallet, Download } from "lucide-react";
+import { useMemo } from "react";
 import { Link, useParams } from "react-router-dom";
 
 import { useToast } from "@shared/lib/hooks/use-toast";
@@ -15,16 +16,108 @@ import { Card, CardContent, CardHeader, CardTitle } from "@shared/ui/card";
 export const EventDetailsPage = () => {
   const { id } = useParams<{ id: string }>();
   const { toast } = useToast();
-  const [event, setEvent] = useState<Event | null>(null);
-  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    if (!id) return;
-    setLoading(true);
-    fetchEventById(id)
-      .then((res) => setEvent(res))
-      .finally(() => setLoading(false));
-  }, [id]);
+  const { data: profileData } = useGetProfileQuery({});
+  const userRole = profileData?.data?.role?.toLowerCase();
+  const isAdmin = userRole === "admin" || userRole === "администратор";
+
+  const { data: eventData, isLoading: loading, refetch } = useGetEventByIdQuery({
+    params: { id: id || "" },
+    options: {
+      enabled: !!id
+    }
+  });
+
+  const joinMutation = useJoinEventMutation({
+    options: {
+      onSuccess: () => {
+        toast({
+          title: "Участие подтверждено",
+          description: "Вы добавлены в список участников"
+        });
+        refetch();
+      },
+      onError: (error: any) => {
+        const errorMessage = error?.response?.data?.message || "Не удалось подтвердить участие";
+        toast({
+          className: "bg-red-800 text-white hover:bg-red-700",
+          title: "Ошибка",
+          description: errorMessage
+        });
+      }
+    }
+  });
+
+  const leaveMutation = useLeaveEventMutation({
+    options: {
+      onSuccess: () => {
+        toast({
+          title: "Участие отменено",
+          description: "Мы убрали событие из раздела «Мои события»"
+        });
+        refetch();
+      },
+      onError: (error: any) => {
+        const errorMessage = error?.response?.data?.message || "Не удалось отменить участие";
+        toast({
+          className: "bg-red-800 text-white hover:bg-red-700",
+          title: "Ошибка",
+          description: errorMessage
+        });
+      }
+    }
+  });
+
+  const exportMutation = useExportParticipantsMutation({
+    options: {
+      onSuccess: async (response) => {
+        try {
+          const blob = response.data;
+          const url = window.URL.createObjectURL(blob);
+          const link = document.createElement("a");
+          link.href = url;
+          const fileName = `participants_${event?.title?.replace(/[^a-zA-Z0-9]/g, "_") || id}_${new Date().toISOString().split("T")[0]}.csv`;
+          link.setAttribute("download", fileName);
+          document.body.appendChild(link);
+          link.click();
+          link.remove();
+          window.URL.revokeObjectURL(url);
+          toast({
+            title: "Экспорт выполнен",
+            description: "Список участников успешно скачан"
+          });
+        } catch (error) {
+          toast({
+            className: "bg-red-800 text-white hover:bg-red-700",
+            title: "Ошибка",
+            description: "Не удалось скачать файл"
+          });
+        }
+      },
+      onError: async (error: any) => {
+        let errorMessage = "Не удалось экспортировать участников";
+        if (error?.response?.data) {
+          try {
+            const text = await error.response.data.text();
+            const json = JSON.parse(text);
+            errorMessage = json.message || errorMessage;
+          } catch {
+            errorMessage = error?.response?.data?.message || errorMessage;
+          }
+        }
+        toast({
+          className: "bg-red-800 text-white hover:bg-red-700",
+          title: "Ошибка",
+          description: errorMessage
+        });
+      }
+    }
+  });
+
+  const event = useMemo(() => {
+    if (!eventData?.data) return null;
+    return mapEventResponseToEvent(eventData.data);
+  }, [eventData]);
 
   if (loading) {
     return (
@@ -143,7 +236,54 @@ export const EventDetailsPage = () => {
       </div>
 
       <div className='mt-6 flex flex-wrap gap-3'>
-        <Button onClick={copyLink}>Скопировать ссылку</Button>
+        {event.status === "active" && (
+          <>
+            {event.userParticipating ? (
+              <Button
+                variant='destructive'
+                onClick={() => {
+                  if (window.confirm("Вы уверены, что хотите отменить участие?")) {
+                    leaveMutation.mutate({ params: { id: event.id } });
+                  }
+                }}
+                disabled={leaveMutation.isPending}
+              >
+                Отменить участие
+              </Button>
+            ) : (
+              <Button
+                onClick={() => {
+                  if (event.participantsLimit && event.participantsCount >= event.participantsLimit) {
+                    toast({
+                      title: "Достигнут максимальный лимит участников",
+                      description: "Свободных мест больше нет"
+                    });
+                    return;
+                  }
+                  joinMutation.mutate({ params: { id: event.id } });
+                }}
+                disabled={joinMutation.isPending}
+              >
+                Подтвердить участие
+              </Button>
+            )}
+          </>
+        )}
+        {isAdmin && (
+          <Button
+            onClick={() => {
+              exportMutation.mutate({ params: { id: event.id, format: "csv" } });
+            }}
+            variant='outline'
+            disabled={exportMutation.isPending}
+          >
+            <Download className='mr-2 h-4 w-4' />
+            {exportMutation.isPending ? "Экспорт..." : "Экспорт участников (CSV)"}
+          </Button>
+        )}
+        <Button onClick={copyLink} variant='outline'>
+          Скопировать ссылку
+        </Button>
         <Button variant='outline' asChild>
           <Link to='/'>Вернуться к афише</Link>
         </Button>

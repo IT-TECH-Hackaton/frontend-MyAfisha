@@ -1,100 +1,191 @@
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
-import { YandexMapPicker } from "@shared/ui/yandex-map-picker";
+import { CreateEventDialog } from "./CreateEventDialog";
+import { useGetUsersQuery } from "../../api/hooks/useGetUsersQuery";
+import { useGetAdminEventsQuery } from "../../api/hooks/useGetAdminEventsQuery";
+import { useUpdateUserMutation } from "../../api/hooks/useUpdateUserMutation";
+import { useDeleteUserMutation } from "../../api/hooks/useDeleteUserMutation";
+import { useResetUserPasswordMutation } from "../../api/hooks/useResetUserPasswordMutation";
+import { useUpdateEventMutation } from "@modules/events/api/hooks/useUpdateEventMutation";
+import { useDeleteEventMutation } from "@modules/events/api/hooks/useDeleteEventMutation";
+import { useGetCategoriesQuery } from "@modules/categories/api/hooks/useGetCategoriesQuery";
+import { useCreateCategoryMutation } from "@modules/categories/api/hooks/useCreateCategoryMutation";
+import { useUpdateCategoryMutation } from "@modules/categories/api/hooks/useUpdateCategoryMutation";
+import { useDeleteCategoryMutation } from "@modules/categories/api/hooks/useDeleteCategoryMutation";
+import type { UserResponse } from "../../api/requests/getUsers";
+import type { AdminEventResponse } from "../../api/requests/getAdminEvents";
+import type { Category } from "@modules/categories/api/requests/getCategories";
+import { useToast } from "@shared/lib/hooks/use-toast";
+import { Badge } from "@shared/ui/badge";
+import { cn } from "@shared/lib/utils";
 
 import "./AdminPage.css";
 
-type Role = "Admin" | "User";
-type UserStatus = "Active" | "Deleted";
-interface User {
-  id: number;
-  name: string;
-  email: string;
-  role: Role;
-  registeredAt: string;
-  status: UserStatus;
-}
-interface Event {
-  id: number;
-  title: string;
-  startDate: string;
-  endDate: string;
-  participantsCount: number;
-  status: "Active" | "Passed";
-}
-
-const initialUsers: User[] = [
-  {
-    id: 1,
-    name: "Иван Иванов",
-    email: "ivan@test.com",
-    role: "Admin",
-    registeredAt: "2023-10-01",
-    status: "Active"
-  },
-  {
-    id: 2,
-    name: "Петр Петров",
-    email: "petr@test.com",
-    role: "User",
-    registeredAt: "2023-11-15",
-    status: "Active"
-  },
-  {
-    id: 3,
-    name: "Сидор Сидоров",
-    email: "sidor@test.com",
-    role: "User",
-    registeredAt: "2023-01-20",
-    status: "Deleted"
-  }
-];
-const initialEvents: Event[] = [
-  {
-    id: 1,
-    title: "Новогодний корпоратив",
-    startDate: "2023-12-25",
-    endDate: "2023-12-26",
-    participantsCount: 45,
-    status: "Active"
-  },
-  {
-    id: 2,
-    title: "Сбор на ДР",
-    startDate: "2023-11-01",
-    endDate: "2023-11-01",
-    participantsCount: 12,
-    status: "Passed"
-  }
-];
-
 interface UserFilters {
-  name: string;
-  role: Role | "";
-  status: UserStatus | "";
+  fullName: string;
+  role: "Пользователь" | "Администратор" | "";
+  status: "Активен" | "Удален" | "";
   dateFrom: string;
   dateTo: string;
 }
 
 function AdminPage() {
-  const [activeTab, setActiveTab] = useState<"users" | "events">("users");
-
-  const [users, setUsers] = useState<User[]>(initialUsers);
-  const [events, setEvents] = useState<Event[]>(initialEvents);
+  const { toast } = useToast();
+  const [activeTab, setActiveTab] = useState<"users" | "events" | "categories">("users");
   const [filters, setFilters] = useState<UserFilters>({
-    name: "",
+    fullName: "",
     role: "",
-    status: "Active",
+    status: "Активен",
     dateFrom: "",
     dateTo: ""
   });
+  const [usersPage, setUsersPage] = useState(1);
+  const [usersLimit] = useState(10);
+
+  const { data: usersData, isLoading: isLoadingUsers, refetch: refetchUsers } = useGetUsersQuery({
+    params: {
+      page: usersPage,
+      limit: usersLimit,
+      fullName: filters.fullName || undefined,
+      role: (filters.role as "Пользователь" | "Администратор") || undefined,
+      status: (filters.status as "Активен" | "Удален") || undefined,
+      dateFrom: filters.dateFrom || undefined,
+      dateTo: filters.dateTo || undefined
+    },
+    options: {
+      refetchOnWindowFocus: false
+    }
+  });
+
+  const usersPagination = usersData?.data?.pagination;
+
+
+  const updateUserMutation = useUpdateUserMutation({
+    options: {
+      onSuccess: () => {
+        toast({
+          title: "Пользователь обновлен",
+          description: "Изменения успешно сохранены"
+        });
+        refetchUsers();
+        setEditUserModalOpen(false);
+        setCurrentUser(null);
+      },
+      onError: (error: any) => {
+        const errorMessage = error?.response?.data?.message || "Не удалось обновить пользователя";
+        toast({
+          className: "bg-red-800 text-white hover:bg-red-700",
+          title: "Ошибка",
+          description: errorMessage
+        });
+      }
+    }
+  });
+
+  const deleteUserMutation = useDeleteUserMutation({
+    options: {
+      onSuccess: () => {
+        toast({
+          title: "Пользователь удален",
+          description: "Пользователь помечен как удаленный"
+        });
+        refetchUsers();
+      },
+      onError: (error: any) => {
+        const errorMessage = error?.response?.data?.message || "Не удалось удалить пользователя";
+        toast({
+          className: "bg-red-800 text-white hover:bg-red-700",
+          title: "Ошибка",
+          description: errorMessage
+        });
+      }
+    }
+  });
+
+  const resetPasswordMutation = useResetUserPasswordMutation({
+    options: {
+      onSuccess: () => {
+        toast({
+          title: "Пароль сброшен",
+          description: "Новый пароль отправлен на почту пользователя"
+        });
+        setResetPasswordModalOpen(false);
+        setCurrentUser(null);
+      },
+      onError: (error: any) => {
+        const errorMessage = error?.response?.data?.message || "Не удалось сбросить пароль";
+        toast({
+          className: "bg-red-800 text-white hover:bg-red-700",
+          title: "Ошибка",
+          description: errorMessage
+        });
+      }
+    }
+  });
+
+  const updateEventMutation = useUpdateEventMutation({
+    options: {
+      onSuccess: () => {
+        toast({
+          title: "Событие обновлено",
+          description: "Изменения успешно сохранены"
+        });
+        refetchEvents();
+        setEditEventModalOpen(false);
+        setCurrentEvent(null);
+      },
+      onError: (error: any) => {
+        const errorMessage = error?.response?.data?.message || "Не удалось обновить событие";
+        toast({
+          className: "bg-red-800 text-white hover:bg-red-700",
+          title: "Ошибка",
+          description: errorMessage
+        });
+      }
+    }
+  });
+
+  const deleteEventMutation = useDeleteEventMutation({
+    options: {
+      onSuccess: () => {
+        toast({
+          title: "Событие удалено",
+          description: "Событие успешно удалено из системы"
+        });
+        refetchEvents();
+      },
+      onError: (error: any) => {
+        const errorMessage = error?.response?.data?.message || "Не удалось удалить событие";
+        toast({
+          className: "bg-red-800 text-white hover:bg-red-700",
+          title: "Ошибка",
+          description: errorMessage
+        });
+      }
+    }
+  });
+
+  const users = usersData?.data?.data || [];
+
+  const [eventStatusFilter, setEventStatusFilter] = useState<"Активное" | "Прошедшее" | "Отклоненное" | "">("");
+
+  const { data: eventsData, isLoading: isLoadingEvents, refetch: refetchEvents } = useGetAdminEventsQuery({
+    params: {
+      status: eventStatusFilter || undefined
+    },
+    options: {
+      refetchOnWindowFocus: false
+    }
+  });
+
+  const events = eventsData?.data || [];
 
   const [isEventModalOpen, setEventModalOpen] = useState(false);
   const [isEditUserModalOpen, setEditUserModalOpen] = useState(false);
   const [isEditEventModalOpen, setEditEventModalOpen] = useState(false);
   const [isResetPasswordModalOpen, setResetPasswordModalOpen] = useState(false);
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [currentEvent, setCurrentEvent] = useState<Event | null>(null);
+  const [currentUser, setCurrentUser] = useState<UserResponse | null>(null);
+  const [currentEvent, setCurrentEvent] = useState<AdminEventResponse | null>(null);
   const [eventForm, setEventForm] = useState({
     title: "",
     startDate: "",
@@ -102,6 +193,99 @@ function AdminPage() {
     participantsCount: 0,
     location: null as { lat: number; lon: number; address?: string } | null
   });
+  const [userForm, setUserForm] = useState({
+    fullName: "",
+    role: "Пользователь" as "Пользователь" | "Администратор"
+  });
+  const [passwordForm, setPasswordForm] = useState({
+    password: "",
+    confirmPassword: ""
+  });
+  const [selectedEventCategories, setSelectedEventCategories] = useState<string[]>([]);
+  const [isCategoryModalOpen, setCategoryModalOpen] = useState(false);
+  const [isEditCategoryModalOpen, setEditCategoryModalOpen] = useState(false);
+  const [currentCategory, setCurrentCategory] = useState<Category | null>(null);
+  const [categoryForm, setCategoryForm] = useState({
+    name: "",
+    description: ""
+  });
+
+  const { data: categoriesData, isLoading: isLoadingCategories, refetch: refetchCategories } = useGetCategoriesQuery({
+    options: { refetchOnWindowFocus: false }
+  });
+
+  const categories = categoriesData?.data?.data || [];
+
+  const createCategoryMutation = useCreateCategoryMutation({
+    options: {
+      onSuccess: () => {
+        toast({
+          title: "Категория создана",
+          description: "Категория успешно добавлена"
+        });
+        refetchCategories();
+        setCategoryModalOpen(false);
+        setCategoryForm({ name: "", description: "" });
+      },
+      onError: (error: any) => {
+        const errorMessage = error?.response?.data?.message || "Не удалось создать категорию";
+        toast({
+          className: "bg-red-800 text-white hover:bg-red-700",
+          title: "Ошибка",
+          description: errorMessage
+        });
+      }
+    }
+  });
+
+  const updateCategoryMutation = useUpdateCategoryMutation({
+    options: {
+      onSuccess: () => {
+        toast({
+          title: "Категория обновлена",
+          description: "Изменения успешно сохранены"
+        });
+        refetchCategories();
+        setEditCategoryModalOpen(false);
+        setCurrentCategory(null);
+        setCategoryForm({ name: "", description: "" });
+      },
+      onError: (error: any) => {
+        const errorMessage = error?.response?.data?.message || "Не удалось обновить категорию";
+        toast({
+          className: "bg-red-800 text-white hover:bg-red-700",
+          title: "Ошибка",
+          description: errorMessage
+        });
+      }
+    }
+  });
+
+  const deleteCategoryMutation = useDeleteCategoryMutation({
+    options: {
+      onSuccess: () => {
+        toast({
+          title: "Категория удалена",
+          description: "Категория успешно удалена"
+        });
+        refetchCategories();
+      },
+      onError: (error: any) => {
+        const errorMessage = error?.response?.data?.message || "Не удалось удалить категорию";
+        toast({
+          className: "bg-red-800 text-white hover:bg-red-700",
+          title: "Ошибка",
+          description: errorMessage
+        });
+      }
+    }
+  });
+
+  useEffect(() => {
+    if (currentEvent && activeTab === "events") {
+      setSelectedEventCategories(currentEvent.categoryIDs || []);
+    }
+  }, [currentEvent, activeTab]);
 
   const handleFilterChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -109,38 +293,30 @@ function AdminPage() {
       ...prev,
       [name]: value
     }));
+    setUsersPage(1);
   };
 
-  const handleDelete = (userId: number) => {
+  const handleDelete = (userId: string) => {
     if (window.confirm(`Вы уверены, что хотите удалить пользователя (мягкое удаление)?`)) {
-      setUsers((prevUsers) =>
-        prevUsers.map((u) => (u.id === userId ? { ...u, status: "Deleted" } : u))
-      );
-      alert("Пользователь помечен как удаленный.");
+      deleteUserMutation.mutate({ params: { id: userId } });
     }
   };
 
-  const handleOpenEditModal = (user: User) => {
+  const handleOpenEditModal = (user: UserResponse) => {
     setCurrentUser(user);
+    setUserForm({
+      fullName: user.fullName,
+      role: user.role
+    });
     setEditUserModalOpen(true);
   };
 
-  const handleOpenResetPasswordModal = (user: User) => {
+  const handleOpenResetPasswordModal = (user: UserResponse) => {
     setCurrentUser(user);
+    setPasswordForm({ password: "", confirmPassword: "" });
     setResetPasswordModalOpen(true);
   };
 
-  const handleOpenEditEventModal = (event: Event) => {
-    setCurrentEvent(event);
-    setEventForm({
-      title: event.title,
-      startDate: event.startDate,
-      endDate: event.endDate,
-      participantsCount: event.participantsCount,
-      location: null
-    });
-    setEditEventModalOpen(true);
-  };
 
   const handleEventFormChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -155,68 +331,81 @@ function AdminPage() {
     if (!currentEvent) return;
 
     if (eventForm.endDate && eventForm.startDate && eventForm.endDate < eventForm.startDate) {
-      alert("Дата окончания должна быть позже даты начала");
+      toast({
+        className: "bg-red-800 text-white hover:bg-red-700",
+        title: "Ошибка",
+        description: "Дата окончания должна быть позже даты начала"
+      });
       return;
     }
 
-    const now = new Date();
-    const endDate = new Date(eventForm.endDate);
-    const updatedStatus = endDate.getTime() && endDate < now ? "Passed" : "Active";
+    const updateData: any = {
+      title: eventForm.title,
+      maxParticipants: eventForm.participantsCount || undefined
+    };
 
-    setEvents((prev) =>
-      prev.map((evt) =>
-        evt.id === currentEvent.id
-          ? {
-              ...evt,
-              ...eventForm,
-              status: updatedStatus
-            }
-          : evt
-      )
-    );
-    setEditEventModalOpen(false);
-    setCurrentEvent(null);
-    alert("Событие обновлено (клиентская симуляция)");
+    if (eventForm.startDate) {
+      const startDateTime = new Date(eventForm.startDate);
+      startDateTime.setHours(12, 0, 0, 0);
+      updateData.startDate = startDateTime.toISOString();
+    }
+
+    if (eventForm.endDate) {
+      const endDateTime = new Date(eventForm.endDate);
+      endDateTime.setHours(23, 59, 59, 999);
+      updateData.endDate = endDateTime.toISOString();
+    }
+
+    if (eventForm.location) {
+      updateData.latitude = eventForm.location.lat;
+      updateData.longitude = eventForm.location.lon;
+      updateData.address = eventForm.location.address;
+    }
+
+    if (selectedEventCategories.length > 0) {
+      updateData.categoryIDs = selectedEventCategories;
+    }
+
+    updateEventMutation.mutate({
+      params: {
+        id: currentEvent.id,
+        ...updateData
+      }
+    });
   };
 
   const handleSaveUser = (e: React.FormEvent) => {
     e.preventDefault();
-    alert("Изменения сохранены (только на клиенте)");
-    setEditUserModalOpen(false);
-    setCurrentUser(null);
+    if (!currentUser) return;
+    updateUserMutation.mutate({
+      params: {
+        id: currentUser.id,
+        fullName: userForm.fullName,
+        role: userForm.role
+      }
+    });
   };
 
   const handleConfirmResetPassword = (e: React.FormEvent) => {
     e.preventDefault();
-    alert(`Пароль для ${currentUser?.email} успешно сброшен и отправлен на почту.`);
-    setResetPasswordModalOpen(false);
-    setCurrentUser(null);
+    if (!currentUser) return;
+    if (passwordForm.password !== passwordForm.confirmPassword) {
+      toast({
+        className: "bg-red-800 text-white hover:bg-red-700",
+        title: "Ошибка",
+        description: "Пароли не совпадают"
+      });
+      return;
+    }
+    resetPasswordMutation.mutate({
+      params: {
+        id: currentUser.id,
+        password: passwordForm.password
+      }
+    });
   };
 
-  const filteredUsers = useMemo(() => {
-    let list = users;
-
-    if (filters.name) {
-      list = list.filter((user) => user.name.toLowerCase().includes(filters.name.toLowerCase()));
-    }
-
-    if (filters.role) {
-      list = list.filter((user) => user.role === filters.role);
-    }
-
-    if (filters.status) {
-      list = list.filter((user) => user.status === filters.status);
-    }
-
-    if (filters.dateFrom) {
-      list = list.filter((user) => user.registeredAt >= filters.dateFrom);
-    }
-    if (filters.dateTo) {
-      list = list.filter((user) => user.registeredAt <= filters.dateTo);
-    }
-
-    return list;
-  }, [users, filters]);
+  const filteredUsers = users;
 
   return (
     <div className='admin-container'>
@@ -235,6 +424,12 @@ function AdminPage() {
           >
             📅 Управление событиями
           </div>
+          <div
+            className={`nav-item ${activeTab === "categories" ? "active" : ""}`}
+            onClick={() => setActiveTab("categories")}
+          >
+            🏷️ Управление категориями
+          </div>
         </nav>
       </aside>
       <main className='main-content'>
@@ -248,8 +443,8 @@ function AdminPage() {
                   type='text'
                   className='form-input'
                   placeholder='Поиск...'
-                  name='name'
-                  value={filters.name}
+                  name='fullName'
+                  value={filters.fullName}
                   onChange={handleFilterChange}
                 />
               </div>
@@ -262,8 +457,8 @@ function AdminPage() {
                   onChange={handleFilterChange}
                 >
                   <option value=''>Все</option>
-                  <option value='Admin'>Администратор</option>
-                  <option value='User'>Пользователь</option>
+                  <option value='Администратор'>Администратор</option>
+                  <option value='Пользователь'>Пользователь</option>
                 </select>
               </div>
               <div className='form-group'>
@@ -274,8 +469,9 @@ function AdminPage() {
                   value={filters.status}
                   onChange={handleFilterChange}
                 >
-                  <option value='Active'>Активен</option>
-                  <option value='Deleted'>Удален</option>
+                  <option value=''>Все</option>
+                  <option value='Активен'>Активен</option>
+                  <option value='Удален'>Удален</option>
                 </select>
               </div>
               <div className='form-group'>
@@ -311,47 +507,99 @@ function AdminPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredUsers.map((user) => (
-                    <tr key={user.id} style={{ opacity: user.status === "Deleted" ? 0.6 : 1 }}>
-                      <td>{user.name}</td>
-                      <td>{user.email}</td>
-                      <td>
-                        <span
-                          className={`badge ${user.role === "Admin" ? "badge-admin" : "badge-user"}`}
-                        >
-                          {user.role}
-                        </span>
-                      </td>
-                      <td>{user.registeredAt}</td>
-                      <td>
-                        <span
-                          className={`badge ${user.status === "Active" ? "badge-active" : "badge-deleted"}`}
-                        >
-                          {user.status === "Active" ? "Активен" : "Удален"}
-                        </span>
-                      </td>
-                      <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>
-                        <button className={`btn-primary`} onClick={() => handleOpenEditModal(user)}>
-                          Редактировать
-                        </button>
-                        <button className='' onClick={() => handleOpenResetPasswordModal(user)}>
-                          Сбросить пароль
-                        </button>
-                        {user.status === "Active" ? (
-                          <button className={`btn-danger`} onClick={() => handleDelete(user.id)}>
-                            Удалить
-                          </button>
-                        ) : (
-                          <button className='' disabled title='Пользователь уже удален'>
-                            Удален
-                          </button>
-                        )}
+                  {isLoadingUsers ? (
+                    Array.from({ length: 5 }).map((_, index) => (
+                      <tr key={`skeleton-${index}`}>
+                        <td>
+                          <div className='skeleton' style={{ height: "16px", width: "150px", borderRadius: "4px" }} />
+                        </td>
+                        <td>
+                          <div className='skeleton' style={{ height: "16px", width: "200px", borderRadius: "4px" }} />
+                        </td>
+                        <td>
+                          <div className='skeleton' style={{ height: "24px", width: "100px", borderRadius: "12px" }} />
+                        </td>
+                        <td>
+                          <div className='skeleton' style={{ height: "16px", width: "100px", borderRadius: "4px" }} />
+                        </td>
+                        <td>
+                          <div className='skeleton' style={{ height: "24px", width: "80px", borderRadius: "12px" }} />
+                        </td>
+                        <td>
+                          <div className='skeleton' style={{ height: "32px", width: "200px", borderRadius: "6px", marginLeft: "auto" }} />
+                        </td>
+                      </tr>
+                    ))
+                  ) : filteredUsers.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} style={{ textAlign: "center", padding: "20px" }}>
+                        Пользователи не найдены
                       </td>
                     </tr>
-                  ))}
+                  ) : (
+                    filteredUsers.map((user) => (
+                      <tr key={user.id} style={{ opacity: user.status === "Удален" ? 0.6 : 1 }}>
+                        <td>{user.fullName}</td>
+                        <td>{user.email}</td>
+                        <td>
+                          <span
+                            className={`badge ${user.role === "Администратор" ? "badge-admin" : "badge-user"}`}
+                          >
+                            {user.role}
+                          </span>
+                        </td>
+                        <td>{new Date(user.createdAt).toLocaleDateString("ru-RU")}</td>
+                        <td>
+                          <span
+                            className={`badge ${user.status === "Активен" ? "badge-active" : "badge-deleted"}`}
+                          >
+                            {user.status}
+                          </span>
+                        </td>
+                        <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>
+                          <button className={`btn-primary`} onClick={() => handleOpenEditModal(user)}>
+                            Редактировать
+                          </button>
+                          <button className='' onClick={() => handleOpenResetPasswordModal(user)}>
+                            Сбросить пароль
+                          </button>
+                          {user.status === "Активен" ? (
+                            <button className={`btn-danger`} onClick={() => handleDelete(user.id)}>
+                              Удалить
+                            </button>
+                          ) : (
+                            <button className='' disabled title='Пользователь уже удален'>
+                              Удален
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
+            {usersPagination && usersPagination.totalPages > 1 && (
+              <div className='pagination' style={{ marginTop: "20px", display: "flex", justifyContent: "center", alignItems: "center", gap: "10px" }}>
+                <button
+                  className='btn'
+                  onClick={() => setUsersPage((prev) => Math.max(1, prev - 1))}
+                  disabled={usersPage === 1 || isLoadingUsers}
+                >
+                  Назад
+                </button>
+                <span style={{ padding: "0 15px" }}>
+                  Страница {usersPagination.page} из {usersPagination.totalPages} (Всего: {usersPagination.total})
+                </span>
+                <button
+                  className='btn'
+                  onClick={() => setUsersPage((prev) => Math.min(usersPagination.totalPages, prev + 1))}
+                  disabled={usersPage === usersPagination.totalPages || isLoadingUsers}
+                >
+                  Вперед
+                </button>
+              </div>
+            )}
           </div>
         )}
 
@@ -365,13 +613,40 @@ function AdminPage() {
             </div>
             <div className='filters-panel'>
               <label>
-                <input type='radio' name='estatus' defaultChecked /> Все
+                <input
+                  type='radio'
+                  name='estatus'
+                  checked={eventStatusFilter === ""}
+                  onChange={() => setEventStatusFilter("")}
+                />{" "}
+                Все
               </label>
               <label>
-                <input type='radio' name='estatus' /> Активные
+                <input
+                  type='radio'
+                  name='estatus'
+                  checked={eventStatusFilter === "Активное"}
+                  onChange={() => setEventStatusFilter("Активное")}
+                />{" "}
+                Активные
               </label>
               <label>
-                <input type='radio' name='estatus' /> Прошедшие
+                <input
+                  type='radio'
+                  name='estatus'
+                  checked={eventStatusFilter === "Прошедшее"}
+                  onChange={() => setEventStatusFilter("Прошедшее")}
+                />{" "}
+                Прошедшие
+              </label>
+              <label>
+                <input
+                  type='radio'
+                  name='estatus'
+                  checked={eventStatusFilter === "Отклоненное"}
+                  onChange={() => setEventStatusFilter("Отклоненное")}
+                />{" "}
+                Отклоненные
               </label>
             </div>
             <div className='table-container'>
@@ -386,30 +661,93 @@ function AdminPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {events.map((event) => (
-                    <tr key={event.id}>
-                      <td>{event.title}</td>
-                      <td>
-                        {event.startDate} — {event.endDate}
-                      </td>
-                      <td>{event.participantsCount} чел.</td>
-                      <td>
-                        <span
-                          className={`badge ${event.status === "Active" ? "badge-active" : "badge-user"}`}
-                        >
-                          {event.status === "Active" ? "Активно" : "Прошло"}
-                        </span>
-                      </td>
-                      <td style={{ textAlign: "right" }}>
-                        <button
-                          className='btn btn-sm btn-primary'
-                          onClick={() => handleOpenEditEventModal(event)}
-                        >
-                          Редактировать
-                        </button>
+                  {isLoadingEvents ? (
+                    Array.from({ length: 5 }).map((_, index) => (
+                      <tr key={`skeleton-event-${index}`}>
+                        <td>
+                          <div className='skeleton' style={{ height: "16px", width: "200px", borderRadius: "4px" }} />
+                        </td>
+                        <td>
+                          <div className='skeleton' style={{ height: "16px", width: "150px", borderRadius: "4px" }} />
+                        </td>
+                        <td>
+                          <div className='skeleton' style={{ height: "16px", width: "80px", borderRadius: "4px" }} />
+                        </td>
+                        <td>
+                          <div className='skeleton' style={{ height: "24px", width: "100px", borderRadius: "12px" }} />
+                        </td>
+                        <td>
+                          <div className='skeleton' style={{ height: "32px", width: "150px", borderRadius: "6px", marginLeft: "auto" }} />
+                        </td>
+                      </tr>
+                    ))
+                  ) : events.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} style={{ textAlign: "center", padding: "20px" }}>
+                        События не найдены
                       </td>
                     </tr>
-                  ))}
+                  ) : (
+                    events.map((event) => (
+                      <tr key={event.id}>
+                        <td>{event.title}</td>
+                        <td>
+                          {new Date(event.startDate).toLocaleDateString("ru-RU")} —{" "}
+                          {new Date(event.endDate).toLocaleDateString("ru-RU")}
+                        </td>
+                        <td>{event.participantsCount} чел.</td>
+                        <td>
+                          <span
+                            className={`badge ${
+                              event.status === "Активное"
+                                ? "badge-active"
+                                : event.status === "Прошедшее"
+                                  ? "badge-user"
+                                  : "badge-deleted"
+                            }`}
+                          >
+                            {event.status === "Активное"
+                              ? "Активно"
+                              : event.status === "Прошедшее"
+                                ? "Прошло"
+                                : "Отклонено"}
+                          </span>
+                        </td>
+                        <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>
+                          <button
+                            className='btn btn-sm btn-primary'
+                            onClick={() => {
+                              setCurrentEvent(event);
+                              const startDate = new Date(event.startDate);
+                              const endDate = new Date(event.endDate);
+                              setEventForm({
+                                title: event.title,
+                                startDate: startDate.toISOString().split("T")[0],
+                                endDate: endDate.toISOString().split("T")[0],
+                                participantsCount: event.participantsCount,
+                                location: null
+                              });
+                              setEditEventModalOpen(true);
+                            }}
+                          >
+                            Редактировать
+                          </button>
+                          <button
+                            className='btn btn-sm btn-danger'
+                            onClick={() => {
+                              if (window.confirm(`Вы уверены, что хотите удалить событие "${event.title}"?`)) {
+                                deleteEventMutation.mutate({ params: { id: event.id } });
+                              }
+                            }}
+                            disabled={deleteEventMutation.isPending}
+                            style={{ marginLeft: "5px" }}
+                          >
+                            Удалить
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
@@ -417,88 +755,14 @@ function AdminPage() {
         )}
       </main>
 
-      {isEventModalOpen && (
-        <div className='modal-overlay' onClick={() => setEventModalOpen(false)}>
-          <div className='modal-content' onClick={(e) => e.stopPropagation()}>
-            <div className='modal-header'>
-              <span>Создание события</span>
-              <button
-                style={{ border: "none", background: "transparent", cursor: "pointer" }}
-                onClick={() => setEventModalOpen(false)}
-              >
-                ✕
-              </button>
-            </div>
-            <div className='modal-body'>
-              <form className='event-form-grid'>
-                <div className='form-group full-width'>
-                  <label>Название события *</label>
-                  <input type='text' className='form-input' />
-                </div>
-                <div className='form-group full-width'>
-                  <label>Краткое описание</label>
-                  <input type='text' className='form-input' />
-                </div>
-                <div className='form-group full-width'>
-                  <label>Полное описание *</label>
-                  <textarea className='form-input' rows={3}></textarea>
-                </div>
-                <div className='form-group'>
-                  <label>Начало *</label>
-                  <input type='datetime-local' className='form-input' />
-                </div>
-                <div className='form-group'>
-                  <label>Конец *</label>
-                  <input type='datetime-local' className='form-input' />
-                </div>
-                <div className='form-group full-width'>
-                  <label>Изображение *</label>
-                  <input type='file' className='form-input' />
-                </div>
-                <div className='form-group full-width'>
-                  <label>Данные по оплате</label>
-                  <textarea className='form-input' placeholder='Реквизиты, сумма...'></textarea>
-                </div>
-                <div className='form-group full-width'>
-                  <label>Место проведения</label>
-                  <YandexMapPicker
-                    onLocationSelect={(coordinates: { lat: number; lon: number }, address?: string) => {
-                      setEventForm((prev) => ({
-                        ...prev,
-                        location: { ...coordinates, address }
-                      }));
-                    }}
-                    className='mt-2'
-                  />
-                </div>
-                <div className='form-group full-width'>
-                  <label>Участники (multiselect)</label>
-                  <select multiple className='form-select' style={{ height: "100px" }}>
-                    <option>Иванов И.И.</option>
-                    <option>Петров П.П.</option>
-                    <option>Сидоров С.С.</option>
-                  </select>
-                </div>
-              </form>
-            </div>
-            <div className='modal-footer'>
-              <button className='btn' onClick={() => setEventModalOpen(false)}>
-                Отмена
-              </button>
-              <button
-                className='btn btn-primary'
-                onClick={() => {
-                  console.log("Адрес события:", eventForm.location?.address);
-                  console.log("Координаты события:", eventForm.location);
-                  console.log("Полная форма события:", eventForm);
-                }}
-              >
-                Создать
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <CreateEventDialog
+        open={isEventModalOpen}
+        onOpenChange={setEventModalOpen}
+        onSuccess={() => {
+          setEventModalOpen(false);
+          refetchEvents();
+        }}
+      />
 
       {isEditEventModalOpen && currentEvent && (
         <div className='modal-overlay' onClick={() => setEditEventModalOpen(false)}>
@@ -558,16 +822,60 @@ function AdminPage() {
                     min={0}
                   />
                 </div>
+                <div className='form-group full-width'>
+                  <label>Категории</label>
+                  {isLoadingCategories ? (
+                    <div style={{ padding: "10px", color: "var(--muted-foreground)" }}>Загрузка категорий...</div>
+                  ) : (
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", padding: "10px", border: "1px solid var(--border-color)", borderRadius: "6px", minHeight: "50px" }}>
+                      {categories.map((category) => {
+                        const isSelected = selectedEventCategories.includes(category.id);
+                        return (
+                          <Badge
+                            key={category.id}
+                            variant={isSelected ? "selected" : "outline"}
+                            className={cn(
+                              "cursor-pointer transition-colors",
+                              isSelected
+                                ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                                : "hover:bg-accent hover:text-accent-foreground"
+                            )}
+                            onClick={() => {
+                              if (isSelected) {
+                                setSelectedEventCategories((prev) => prev.filter((id) => id !== category.id));
+                              } else {
+                                setSelectedEventCategories((prev) => [...prev, category.id]);
+                              }
+                            }}
+                          >
+                            {category.name}
+                          </Badge>
+                        );
+                      })}
+                      {categories.length === 0 && (
+                        <div style={{ color: "var(--muted-foreground)" }}>Категории не найдены</div>
+                      )}
+                    </div>
+                  )}
+                </div>
                 <div className='modal-footer full-width' style={{ justifyContent: "flex-end" }}>
                   <button
                     className='btn'
                     type='button'
-                    onClick={() => setEditEventModalOpen(false)}
+                    onClick={() => {
+                      setEditEventModalOpen(false);
+                      setCurrentEvent(null);
+                    }}
+                    disabled={updateEventMutation.isPending}
                   >
                     Отмена
                   </button>
-                  <button className='btn btn-primary' type='submit'>
-                    Сохранить
+                  <button
+                    className='btn btn-primary'
+                    type='submit'
+                    disabled={updateEventMutation.isPending}
+                  >
+                    {updateEventMutation.isPending ? "Сохранение..." : "Сохранить"}
                   </button>
                 </div>
               </form>
@@ -581,7 +889,7 @@ function AdminPage() {
         <div className='modal-overlay' onClick={() => setEditUserModalOpen(false)}>
           <div className='modal-content' onClick={(e) => e.stopPropagation()}>
             <div className='modal-header'>
-              <span>Редактирование пользователя: {currentUser.name}</span>
+              <span>Редактирование пользователя: {currentUser.fullName}</span>
               <button
                 style={{ border: "none", background: "transparent", cursor: "pointer" }}
                 onClick={() => setEditUserModalOpen(false)}
@@ -593,31 +901,54 @@ function AdminPage() {
               <form onSubmit={handleSaveUser}>
                 <div className='form-group' style={{ marginBottom: "15px" }}>
                   <label>ФИО</label>
-                  <input type='text' className='form-input' defaultValue={currentUser.name} />
+                  <input
+                    type='text'
+                    className='form-input'
+                    value={userForm.fullName}
+                    onChange={(e) => setUserForm((prev) => ({ ...prev, fullName: e.target.value }))}
+                    required
+                  />
                 </div>
                 <div className='form-group' style={{ marginBottom: "15px" }}>
                   <label>Email (нельзя менять)</label>
                   <input
                     type='email'
                     className='form-input'
-                    defaultValue={currentUser.email}
+                    value={currentUser.email}
                     disabled
                     style={{ background: "#eee" }}
                   />
                 </div>
                 <div className='form-group'>
                   <label>Роль</label>
-                  <select className='form-select' defaultValue={currentUser.role}>
-                    <option>User</option>
-                    <option>Admin</option>
+                  <select
+                    className='form-select'
+                    value={userForm.role}
+                    onChange={(e) =>
+                      setUserForm((prev) => ({
+                        ...prev,
+                        role: e.target.value as "Пользователь" | "Администратор"
+                      }))
+                    }
+                  >
+                    <option value='Пользователь'>Пользователь</option>
+                    <option value='Администратор'>Администратор</option>
                   </select>
                 </div>
                 <div className='modal-footer'>
-                  <button className='btn' type='button' onClick={() => setEditUserModalOpen(false)}>
+                  <button
+                    className='btn'
+                    type='button'
+                    onClick={() => {
+                      setEditUserModalOpen(false);
+                      setCurrentUser(null);
+                    }}
+                    disabled={updateUserMutation.isPending}
+                  >
                     Отмена
                   </button>
-                  <button className='btn btn-primary' type='submit'>
-                    Сохранить
+                  <button className='btn btn-primary' type='submit' disabled={updateUserMutation.isPending}>
+                    {updateUserMutation.isPending ? "Сохранение..." : "Сохранить"}
                   </button>
                 </div>
               </form>
@@ -631,7 +962,7 @@ function AdminPage() {
         <div className='modal-overlay' onClick={() => setResetPasswordModalOpen(false)}>
           <div className='modal-content' onClick={(e) => e.stopPropagation()}>
             <div className='modal-header'>
-              <span>Сброс пароля для {currentUser.name}</span>
+              <span>Сброс пароля для {currentUser.fullName}</span>
               <button
                 style={{ border: "none", background: "transparent", cursor: "pointer" }}
                 onClick={() => setResetPasswordModalOpen(false)}
@@ -648,22 +979,198 @@ function AdminPage() {
               <form onSubmit={handleConfirmResetPassword}>
                 <div className='form-group' style={{ marginBottom: "15px" }}>
                   <label>Новый пароль</label>
-                  <input type='password' className='form-input' required />
+                  <input
+                    type='password'
+                    className='form-input'
+                    value={passwordForm.password}
+                    onChange={(e) =>
+                      setPasswordForm((prev) => ({ ...prev, password: e.target.value }))
+                    }
+                    required
+                    minLength={8}
+                  />
                 </div>
                 <div className='form-group' style={{ marginBottom: "15px" }}>
                   <label>Повторите пароль</label>
-                  <input type='password' className='form-input' required />
+                  <input
+                    type='password'
+                    className='form-input'
+                    value={passwordForm.confirmPassword}
+                    onChange={(e) =>
+                      setPasswordForm((prev) => ({ ...prev, confirmPassword: e.target.value }))
+                    }
+                    required
+                    minLength={8}
+                  />
                 </div>
                 <div className='modal-footer'>
                   <button
                     className='btn'
                     type='button'
-                    onClick={() => setResetPasswordModalOpen(false)}
+                    onClick={() => {
+                      setResetPasswordModalOpen(false);
+                      setCurrentUser(null);
+                    }}
+                    disabled={resetPasswordMutation.isPending}
                   >
                     Отмена
                   </button>
-                  <button className='btn btn-primary' type='submit'>
-                    Сбросить и отправить
+                  <button
+                    className='btn btn-primary'
+                    type='submit'
+                    disabled={resetPasswordMutation.isPending}
+                  >
+                    {resetPasswordMutation.isPending ? "Отправка..." : "Сбросить и отправить"}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 4. Create Category Modal */}
+      {isCategoryModalOpen && (
+        <div className='modal-overlay' onClick={() => setCategoryModalOpen(false)}>
+          <div className='modal-content' onClick={(e) => e.stopPropagation()}>
+            <div className='modal-header'>
+              <span>Создание категории</span>
+              <button
+                style={{ border: "none", background: "transparent", cursor: "pointer" }}
+                onClick={() => setCategoryModalOpen(false)}
+              >
+                ✕
+              </button>
+            </div>
+            <div className='modal-body'>
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (!categoryForm.name.trim()) {
+                    toast({
+                      className: "bg-red-800 text-white hover:bg-red-700",
+                      title: "Ошибка",
+                      description: "Название категории обязательно"
+                    });
+                    return;
+                  }
+                  createCategoryMutation.mutate({
+                    params: {
+                      name: categoryForm.name.trim(),
+                      description: categoryForm.description.trim() || undefined
+                    }
+                  });
+                }}
+              >
+                <div className='form-group' style={{ marginBottom: "15px" }}>
+                  <label>Название *</label>
+                  <input
+                    type='text'
+                    className='form-input'
+                    value={categoryForm.name}
+                    onChange={(e) => setCategoryForm((prev) => ({ ...prev, name: e.target.value }))}
+                    required
+                  />
+                </div>
+                <div className='form-group' style={{ marginBottom: "15px" }}>
+                  <label>Описание</label>
+                  <textarea
+                    className='form-input'
+                    rows={3}
+                    value={categoryForm.description}
+                    onChange={(e) => setCategoryForm((prev) => ({ ...prev, description: e.target.value }))}
+                  />
+                </div>
+                <div className='modal-footer'>
+                  <button
+                    className='btn'
+                    type='button'
+                    onClick={() => {
+                      setCategoryModalOpen(false);
+                      setCategoryForm({ name: "", description: "" });
+                    }}
+                    disabled={createCategoryMutation.isPending}
+                  >
+                    Отмена
+                  </button>
+                  <button className='btn btn-primary' type='submit' disabled={createCategoryMutation.isPending}>
+                    {createCategoryMutation.isPending ? "Создание..." : "Создать"}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 5. Edit Category Modal */}
+      {isEditCategoryModalOpen && currentCategory && (
+        <div className='modal-overlay' onClick={() => setEditCategoryModalOpen(false)}>
+          <div className='modal-content' onClick={(e) => e.stopPropagation()}>
+            <div className='modal-header'>
+              <span>Редактирование категории: {currentCategory.name}</span>
+              <button
+                style={{ border: "none", background: "transparent", cursor: "pointer" }}
+                onClick={() => setEditCategoryModalOpen(false)}
+              >
+                ✕
+              </button>
+            </div>
+            <div className='modal-body'>
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (!categoryForm.name.trim()) {
+                    toast({
+                      className: "bg-red-800 text-white hover:bg-red-700",
+                      title: "Ошибка",
+                      description: "Название категории обязательно"
+                    });
+                    return;
+                  }
+                  updateCategoryMutation.mutate({
+                    params: {
+                      id: currentCategory.id,
+                      name: categoryForm.name.trim(),
+                      description: categoryForm.description.trim() || undefined
+                    }
+                  });
+                }}
+              >
+                <div className='form-group' style={{ marginBottom: "15px" }}>
+                  <label>Название *</label>
+                  <input
+                    type='text'
+                    className='form-input'
+                    value={categoryForm.name}
+                    onChange={(e) => setCategoryForm((prev) => ({ ...prev, name: e.target.value }))}
+                    required
+                  />
+                </div>
+                <div className='form-group' style={{ marginBottom: "15px" }}>
+                  <label>Описание</label>
+                  <textarea
+                    className='form-input'
+                    rows={3}
+                    value={categoryForm.description}
+                    onChange={(e) => setCategoryForm((prev) => ({ ...prev, description: e.target.value }))}
+                  />
+                </div>
+                <div className='modal-footer'>
+                  <button
+                    className='btn'
+                    type='button'
+                    onClick={() => {
+                      setEditCategoryModalOpen(false);
+                      setCurrentCategory(null);
+                      setCategoryForm({ name: "", description: "" });
+                    }}
+                    disabled={updateCategoryMutation.isPending}
+                  >
+                    Отмена
+                  </button>
+                  <button className='btn btn-primary' type='submit' disabled={updateCategoryMutation.isPending}>
+                    {updateCategoryMutation.isPending ? "Сохранение..." : "Сохранить"}
                   </button>
                 </div>
               </form>

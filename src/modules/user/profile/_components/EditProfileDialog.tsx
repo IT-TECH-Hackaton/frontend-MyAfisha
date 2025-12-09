@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { Camera, Loader2 } from "lucide-react";
@@ -16,16 +16,19 @@ import {
 } from "@shared/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@shared/ui/form";
 import { Input } from "@shared/ui/input";
+import { Badge } from "@shared/ui/badge";
 import { cn } from "@shared/lib/utils";
 
 import type { UserData } from "../../types";
 import { useUpdateProfileMutation } from "../../api/hooks/useUpdateProfileMutation";
 import { useUploadImageMutation } from "@shared/api/hooks/useUploadImageMutation";
+import { useGetInterestsQuery } from "../../api/hooks/useGetInterestsQuery";
 
 const editProfileSchema = z.object({
   firstName: z.string().min(1, { message: "Имя обязательно для заполнения" }),
   secondName: z.string().min(1, { message: "Фамилия обязательна для заполнения" }),
   phone: z.string().optional(),
+  tag: z.string().optional(),
   birthDate: z.string().optional(),
   avatar: z.instanceof(File).optional()
 });
@@ -47,19 +50,30 @@ export const EditProfileDialog = ({
     userData.image?.fileUrl || null
   );
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const [selectedInterests, setSelectedInterests] = useState<string[]>(
+    userData.interests?.map((i) => i.id) || []
+  );
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const updateProfileMutation = useUpdateProfileMutation();
   const uploadImageMutation = useUploadImageMutation();
+  const { data: interestsData, isLoading: isLoadingInterests } = useGetInterestsQuery({
+    options: { enabled: open }
+  });
+
+  useEffect(() => {
+    if (open && userData.interests) {
+      setSelectedInterests(userData.interests.map((i) => i.id));
+    }
+  }, [open, userData.interests]);
 
   const form = useForm<z.infer<typeof editProfileSchema>>({
     resolver: zodResolver(editProfileSchema),
     defaultValues: {
-      fullName:
-        userData.firstName && userData.secondName
-          ? `${userData.firstName} ${userData.secondName}`
-          : userData.firstName || "",
+      firstName: userData.firstName || "",
+      secondName: userData.secondName || "",
       phone: userData.phone || "",
+      tag: userData.tag || "",
       birthDate: userData.birthDate || ""
     }
   });
@@ -112,13 +126,21 @@ export const EditProfileDialog = ({
         imageUrl = uploadResult.data.url;
       }
 
-      const updateData: { fullName?: string; phone?: string; birthDate?: string; imageURL?: string } = {};
+      const updateData: { fullName?: string; phone?: string; tag?: string; birthDate?: string; imageURL?: string; interestIds?: string[] } = {};
 
-      if (values.fullName) {
-        updateData.fullName = values.fullName;
+      if (values.firstName && values.secondName) {
+        updateData.fullName = `${values.firstName} ${values.secondName}`;
+      } else if (values.firstName) {
+        updateData.fullName = values.firstName;
+      } else if (values.secondName) {
+        updateData.fullName = values.secondName;
       }
+
       if (values.phone !== undefined) {
         updateData.phone = values.phone;
+      }
+      if (values.tag !== undefined) {
+        updateData.tag = values.tag;
       }
       if (values.birthDate) {
         updateData.birthDate = values.birthDate;
@@ -126,6 +148,7 @@ export const EditProfileDialog = ({
       if (imageUrl) {
         updateData.imageURL = imageUrl;
       }
+      updateData.interestIds = selectedInterests;
 
       await updateProfileMutation.mutateAsync({
         params: updateData
@@ -197,12 +220,25 @@ export const EditProfileDialog = ({
             </div>
             <FormField
               control={form.control}
-              name='fullName'
+              name='firstName'
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>ФИО</FormLabel>
+                  <FormLabel>Имя</FormLabel>
                   <FormControl>
-                    <Input placeholder='Введите ФИО' {...field} />
+                    <Input placeholder='Введите имя' {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name='secondName'
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Фамилия</FormLabel>
+                  <FormControl>
+                    <Input placeholder='Введите фамилию' {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -223,6 +259,19 @@ export const EditProfileDialog = ({
             />
             <FormField
               control={form.control}
+              name='tag'
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Тег</FormLabel>
+                  <FormControl>
+                    <Input placeholder='Введите тег (например, @username)' {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
               name='birthDate'
               render={({ field }) => (
                 <FormItem>
@@ -234,6 +283,42 @@ export const EditProfileDialog = ({
                 </FormItem>
               )}
             />
+            <FormItem>
+              <FormLabel>Интересы</FormLabel>
+              {isLoadingInterests ? (
+                <div className='text-sm text-muted-foreground'>Загрузка интересов...</div>
+              ) : (
+                <div className='flex flex-wrap gap-2'>
+                  {interestsData?.data?.data?.map((interest) => {
+                    const isSelected = selectedInterests.includes(interest.id);
+                    return (
+                      <Badge
+                        key={interest.id}
+                        variant={isSelected ? "selected" : "outline"}
+                        className={cn(
+                          "cursor-pointer transition-colors",
+                          isSelected
+                            ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                            : "hover:bg-accent hover:text-accent-foreground"
+                        )}
+                        onClick={() => {
+                          if (isSelected) {
+                            setSelectedInterests((prev) => prev.filter((id) => id !== interest.id));
+                          } else {
+                            setSelectedInterests((prev) => [...prev, interest.id]);
+                          }
+                        }}
+                      >
+                        {interest.name}
+                      </Badge>
+                    );
+                  })}
+                  {(!interestsData?.data?.data || interestsData.data.data.length === 0) && (
+                    <div className='text-sm text-muted-foreground'>Интересы не найдены</div>
+                  )}
+                </div>
+              )}
+            </FormItem>
             <DialogFooter>
               <Button type='button' variant='outline' onClick={() => onOpenChange(false)}>
                 Отмена

@@ -1,8 +1,9 @@
 import { useRef, useState } from "react";
-import { Mail, User as UserIcon, Calendar, Shield, Pencil, Camera, Loader2 } from "lucide-react";
+import { Mail, User as UserIcon, Calendar, Shield, Pencil, Camera, Loader2, Phone, Hash, Heart } from "lucide-react";
 
 import { Button } from "@shared/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@shared/ui/card";
+import { Badge } from "@shared/ui/badge";
 import { toast } from "@shared/lib/hooks/use-toast";
 import { cn } from "@shared/lib/utils";
 import { LogoutButton } from "@modules/auth";
@@ -211,10 +212,20 @@ export const ProfilePage = () => {
 
               {userData?.phone && (
                 <div className='flex items-center gap-3'>
-                  <UserIcon className='h-5 w-5 text-muted-foreground' />
+                  <Phone className='h-5 w-5 text-muted-foreground' />
                   <div>
                     <p className='text-sm font-medium'>Телефон</p>
                     <p className='text-sm text-muted-foreground'>{userData.phone}</p>
+                  </div>
+                </div>
+              )}
+
+              {userData?.tag && (
+                <div className='flex items-center gap-3'>
+                  <Hash className='h-5 w-5 text-muted-foreground' />
+                  <div>
+                    <p className='text-sm font-medium'>Тег</p>
+                    <p className='text-sm text-muted-foreground'>{userData.tag}</p>
                   </div>
                 </div>
               )}
@@ -233,6 +244,22 @@ export const ProfilePage = () => {
                   <div>
                     <p className='text-sm font-medium'>Дата рождения</p>
                     <p className='text-sm text-muted-foreground'>{formatDate(userData.birthDate)}</p>
+                  </div>
+                </div>
+              )}
+
+              {userData?.interests && userData.interests.length > 0 && (
+                <div className='flex items-start gap-3'>
+                  <Heart className='mt-0.5 h-5 w-5 text-muted-foreground' />
+                  <div className='flex-1'>
+                    <p className='text-sm font-medium mb-2'>Интересы</p>
+                    <div className='flex flex-wrap gap-2'>
+                      {userData.interests.map((interest) => (
+                        <Badge key={interest.id} variant='secondary'>
+                          {interest.name}
+                        </Badge>
+                      ))}
+                    </div>
                   </div>
                 </div>
               )}

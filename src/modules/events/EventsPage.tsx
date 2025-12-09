@@ -1,17 +1,13 @@
-import {
-  fetchEvents,
-  isDateWithinEvent,
-  updateEventStatuses
-} from "@modules/events/lib/events-data";
-import type { Event } from "@modules/events/types/event";
+import { mapEventResponseToEvent } from "@modules/events/lib/mapEventResponse";
+import { useGetEventsQuery } from "@modules/events/api/hooks/useGetEventsQuery";
 import { EventCard } from "@modules/events/ui/EventCard";
 import { EventsMap } from "@modules/events/ui/EventsMap";
-import { CalendarDays, CalendarRange, ChevronLeft, ChevronRight } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { CalendarDays, CalendarRange, ChevronLeft, ChevronRight, Search } from "lucide-react";
+import { useMemo, useRef, useState, useEffect } from "react";
 
-import { useToast } from "@shared/lib/hooks/use-toast";
 import { cn } from "@shared/lib/utils";
 import { Button } from "@shared/ui/button";
+import { Input } from "@shared/ui/input";
 
 type EventTab = "my" | "active" | "past";
 
@@ -47,95 +43,61 @@ const isSameDay = (left: Date | null, right: Date | null) => {
 };
 
 export const EventsPage = () => {
-  const { toast } = useToast();
-
-  const [events, setEvents] = useState<Event[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<EventTab>("my");
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [sortBy, setSortBy] = useState<"startDate" | "participantsCount">("startDate");
+  const [sortOrder, setSortOrder] = useState<"ASC" | "DESC">("ASC");
+  const [page, setPage] = useState(1);
+  const [limit] = useState(12);
   const stripRef = useRef<HTMLDivElement | null>(null);
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const dateStrip = useMemo(() => buildDateStrip(), []);
 
-  const applyStatusRefresh = useCallback(
-    () =>
-      setEvents((prev) => {
-        if (!prev.length) return prev;
-        return updateEventStatuses(prev);
-      }),
-    []
-  );
+  useEffect(() => {
+    setPage(1);
+  }, [activeTab, selectedDate, sortBy, sortOrder]);
 
   useEffect(() => {
-    setIsLoading(true);
-    fetchEvents()
-      .then((data) => setEvents(updateEventStatuses(data)))
-      .finally(() => setIsLoading(false));
-  }, []);
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+    searchTimeoutRef.current = setTimeout(() => {
+      setPage(1);
+    }, 500);
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, [searchQuery]);
 
-  useEffect(() => {
-    const timer = setInterval(applyStatusRefresh, 60 * 1000);
-    return () => clearInterval(timer);
-  }, [applyStatusRefresh]);
+  const { data: eventsData, isLoading, error: eventsError } = useGetEventsQuery({
+    params: {
+      tab: activeTab === "my" ? "my" : activeTab === "active" ? "active" : "past",
+      dateFrom: selectedDate ? selectedDate.toISOString().split("T")[0] : undefined,
+      dateTo: selectedDate ? selectedDate.toISOString().split("T")[0] : undefined,
+      search: searchQuery || undefined,
+      sortBy,
+      sortOrder,
+      page,
+      limit
+    },
+    options: {
+      refetchOnWindowFocus: false,
+      retry: 1
+    }
+  });
 
-  const filteredEvents = useMemo(() => {
-    const base = events
-      .filter((event) => event.status !== "declined")
-      .sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
+  const events = useMemo(() => {
+    if (!eventsData?.data?.data) return [];
+    return eventsData.data.data.map(mapEventResponseToEvent);
+  }, [eventsData]);
 
-    const byTab = base.filter((event) => {
-      if (activeTab === "active") return event.status === "active";
-      if (activeTab === "past") return event.status === "past";
-      return event.userParticipating && (event.status === "active" || event.status === "past");
-    });
+  const eventsPagination = eventsData?.data?.pagination;
 
-    if (!selectedDate) return byTab;
-    return byTab.filter((event) => isDateWithinEvent(event, selectedDate));
-  }, [events, activeTab, selectedDate]);
-
-  const handleConfirmParticipation = (eventId: string) => {
-    setEvents((prev) =>
-      prev.map((event) => {
-        if (event.id !== eventId) return event;
-        if (event.participantsLimit && event.participantsCount >= event.participantsLimit) {
-          toast({
-            title: "Достигнут максимальный лимит участников",
-            description: "Свободных мест больше нет"
-          });
-          return event;
-        }
-        return {
-          ...event,
-          participantsCount: event.participantsCount + 1,
-          userParticipating: true
-        };
-      })
-    );
-
-    toast({
-      title: "Участие подтверждено",
-      description: "Вы добавлены в список участников"
-    });
-  };
-
-  const confirmCancelParticipation = () => {
-    setEvents((prev) =>
-      prev.map((event) =>
-        event.id === ""
-          ? {
-              ...event,
-              participantsCount: Math.max(0, event.participantsCount - 1),
-              userParticipating: false
-            }
-          : event
-      )
-    );
-
-    toast({
-      title: "Участие отменено",
-      description: "Мы убрали событие из раздела «Мои события»"
-    });
-  };
+  const filteredEvents = events;
 
   const scrollStrip = (direction: "left" | "right") => {
     if (!stripRef.current) return;
@@ -215,6 +177,38 @@ export const EventsPage = () => {
     </div>
   );
 
+  const renderFilters = () => (
+    <div className='mb-4 flex flex-col gap-4 rounded-xl border bg-card p-4 shadow-sm sm:flex-row sm:items-center'>
+      <div className='relative flex-1'>
+        <Search className='absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground' />
+        <Input
+          type='text'
+          placeholder='Поиск по названию или описанию...'
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className='pl-9'
+        />
+      </div>
+      <div className='flex items-center gap-2'>
+        <select
+          value={`${sortBy}-${sortOrder}`}
+          onChange={(e) => {
+            const [by, order] = e.target.value.split("-") as [typeof sortBy, typeof sortOrder];
+            setSortBy(by);
+            setSortOrder(order);
+            setPage(1);
+          }}
+          className='h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
+        >
+          <option value='startDate-ASC'>Дата: сначала ранние</option>
+          <option value='startDate-DESC'>Дата: сначала поздние</option>
+          <option value='participantsCount-DESC'>Участников: больше</option>
+          <option value='participantsCount-ASC'>Участников: меньше</option>
+        </select>
+      </div>
+    </div>
+  );
+
   const renderTabs = () => (
     <div className='flex flex-wrap items-center justify-between gap-3'>
       <div className='flex flex-wrap gap-2'>
@@ -225,7 +219,10 @@ export const EventsPage = () => {
             <button
               key={tabKey}
               type='button'
-              onClick={() => setActiveTab(tabKey)}
+              onClick={() => {
+                setActiveTab(tabKey);
+                setPage(1);
+              }}
               className={cn(
                 "rounded-lg border px-4 py-2 text-left shadow-sm transition",
                 isActive
@@ -241,7 +238,16 @@ export const EventsPage = () => {
       </div>
 
       <div className='text-sm text-muted-foreground'>
-        {filteredEvents.length} событи{filteredEvents.length === 1 ? "е" : "я"}
+        {eventsPagination ? (
+          <>
+            Показано {filteredEvents.length} из {eventsPagination.total} событи
+            {eventsPagination.total === 1 ? "я" : "й"}
+          </>
+        ) : (
+          <>
+            {filteredEvents.length} событи{filteredEvents.length === 1 ? "е" : "я"}
+          </>
+        )}
       </div>
     </div>
   );
@@ -284,11 +290,28 @@ export const EventsPage = () => {
         {renderDateStrip()}
 
         <div className='rounded-xl border bg-card p-4 shadow-sm'>
+          {renderFilters()}
           {renderTabs()}
 
           <div className='mt-6'>
             {isLoading ? (
               renderSkeleton()
+            ) : eventsError ? (
+              <div className='flex flex-col items-center gap-3 rounded-xl border border-destructive/50 bg-destructive/10 p-10 text-center'>
+                <div className='text-lg font-semibold text-destructive'>Ошибка загрузки событий</div>
+                <div className='text-sm text-muted-foreground'>
+                  {eventsError instanceof Error
+                    ? eventsError.message
+                    : "Не удалось загрузить события. Пожалуйста, попробуйте позже."}
+                </div>
+                <Button
+                  variant='outline'
+                  onClick={() => window.location.reload()}
+                  className='mt-2'
+                >
+                  Обновить страницу
+                </Button>
+              </div>
             ) : filteredEvents.length ? (
               <div className='grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'>
                 {filteredEvents.map((event) => (
@@ -301,13 +324,35 @@ export const EventsPage = () => {
           </div>
         </div>
 
-        {eventsForMap.length > 0 && (
-          <div className='rounded-xl border bg-card p-4 shadow-sm'>
-            <h2 className='mb-4 text-lg font-semibold'>Карта событий</h2>
-            <EventsMap events={eventsForMap} />
+            {eventsPagination && eventsPagination.totalPages > 1 && (
+              <div className='mt-6 flex items-center justify-center gap-4'>
+                <Button
+                  variant='outline'
+                  onClick={() => setPage((prev) => Math.max(1, prev - 1))}
+                  disabled={page === 1 || isLoading}
+                >
+                  Назад
+                </Button>
+                <span className='text-sm text-muted-foreground'>
+                  Страница {eventsPagination.page} из {eventsPagination.totalPages}
+                </span>
+                <Button
+                  variant='outline'
+                  onClick={() => setPage((prev) => Math.min(eventsPagination.totalPages, prev + 1))}
+                  disabled={page === eventsPagination.totalPages || isLoading}
+                >
+                  Вперед
+                </Button>
+              </div>
+            )}
+
+            {eventsForMap.length > 0 && (
+              <div className='rounded-xl border bg-card p-4 shadow-sm'>
+                <h2 className='mb-4 text-lg font-semibold'>Карта событий</h2>
+                <EventsMap events={eventsForMap} />
+              </div>
+            )}
           </div>
-        )}
-      </div>
-    </div>
-  );
-};
+        </div>
+      );
+    };
