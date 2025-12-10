@@ -47,6 +47,12 @@ const createEventSchema = z
     endDate: z.string().min(1, "Дата окончания обязательна"),
     endTime: z.string().min(1, "Время окончания обязательно"),
     imageFile: z.instanceof(File, { message: "Изображение обязательно" }).optional(),
+    imageUrl: z
+      .union([
+        z.literal(""),
+        z.string().max(1000, "Максимум 1000 символов").url("Введите корректную ссылку")
+      ])
+      .optional(),
     paymentInfo: z.string().max(1000, "Максимум 1000 символов").optional(),
     maxParticipants: z.coerce
       .number()
@@ -83,6 +89,25 @@ const createEventSchema = z
     {
       message: "Дата и время начала должны быть в будущем",
       path: ["startDate"]
+    }
+  )
+  .refine(
+    (data) => data.imageFile instanceof File || (data.imageUrl && data.imageUrl.trim().length > 0),
+    {
+      message: "Загрузите изображение или укажите ссылку",
+      path: ["imageFile"]
+    }
+  )
+  .refine(
+    (data) =>
+      !(
+        data.imageFile instanceof File &&
+        data.imageUrl &&
+        data.imageUrl.trim().length > 0
+      ),
+    {
+      message: "Укажите либо файл, либо ссылку (не оба)",
+      path: ["imageUrl"]
     }
   );
 
@@ -150,12 +175,14 @@ export const CreateEventDialog = ({ open, onOpenChange, onSuccess }: CreateEvent
       endTime: "",
       paymentInfo: "",
       maxParticipants: undefined,
+      imageUrl: "",
       address: "",
       latitude: undefined,
       longitude: undefined,
       yandexMapLink: ""
     }
   });
+  const imageFile = form.watch("imageFile");
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -186,6 +213,7 @@ export const CreateEventDialog = ({ open, onOpenChange, onSuccess }: CreateEvent
     reader.readAsDataURL(file);
 
     form.setValue("imageFile", file);
+    form.setValue("imageUrl", "");
   };
 
   const handleLocationSelect = (coordinates: { lat: number; lon: number }, address?: string) => {
@@ -195,33 +223,69 @@ export const CreateEventDialog = ({ open, onOpenChange, onSuccess }: CreateEvent
   };
 
   const onSubmit = async (values: CreateEventFormValues) => {
+    console.log("onSubmit вызван", values);
+    console.log("imageFile:", values.imageFile);
+    console.log("imageUrl:", values.imageUrl);
+    
     try {
-      if (!values.imageFile) {
+      let imageURL: string | undefined = values.imageUrl?.trim() || undefined;
+
+      if (!imageURL && values.imageFile) {
+        try {
+          const uploadResult = await uploadImageMutation.mutateAsync({
+            params: { file: values.imageFile }
+          });
+
+          console.log("Upload result:", uploadResult);
+          console.log("Upload result data:", uploadResult?.data);
+
+          imageURL =
+            uploadResult?.data?.imageURL ||
+            uploadResult?.data?.url ||
+            uploadResult?.data?.path ||
+            (uploadResult?.data as any)?.data?.imageURL;
+
+          console.log("Extracted imageURL:", imageURL);
+
+          if (!imageURL) {
+            toast({
+              className: "bg-red-800 text-white hover:bg-red-700",
+              title: "Ошибка",
+              description: "Сервер не вернул ссылку на изображение. Проверьте ответ сервера в консоли."
+            });
+            return;
+          }
+        } catch (error: any) {
+          console.error("Upload error:", error);
+          const errorMessage =
+            error?.response?.data?.error ||
+            error?.response?.data?.message ||
+            error?.message ||
+            "Не удалось загрузить изображение";
+          toast({
+            className: "bg-red-800 text-white hover:bg-red-700",
+            title: "Ошибка загрузки",
+            description: errorMessage
+          });
+          return;
+        }
+      }
+
+      if (!imageURL) {
         toast({
           className: "bg-red-800 text-white hover:bg-red-700",
           title: "Ошибка",
-          description: "Изображение обязательно для создания события"
+          description: "Не удалось получить ссылку на изображение"
         });
         return;
       }
 
-      const uploadResult = await uploadImageMutation.mutateAsync({
-        params: { file: values.imageFile }
-      });
+      const parseLocalDateTime = (date: string, time: string) => new Date(`${date}T${time}`);
+      const toIsoPreserveLocal = (dt: Date) =>
+        new Date(dt.getTime() - dt.getTimezoneOffset() * 60000).toISOString();
 
-      if (!uploadResult.data.url) {
-        toast({
-          className: "bg-red-800 text-white hover:bg-red-700",
-          title: "Ошибка",
-          description: "Не удалось загрузить изображение"
-        });
-        return;
-      }
-
-      const imageURL = uploadResult.data.url;
-
-      const startDateTime = new Date(`${values.startDate}T${values.startTime}`);
-      const endDateTime = new Date(`${values.endDate}T${values.endTime}`);
+      const startDateTime = parseLocalDateTime(values.startDate, values.startTime);
+      const endDateTime = parseLocalDateTime(values.endDate, values.endTime);
 
       if (isNaN(startDateTime.getTime()) || isNaN(endDateTime.getTime())) {
         toast({
@@ -232,8 +296,26 @@ export const CreateEventDialog = ({ open, onOpenChange, onSuccess }: CreateEvent
         return;
       }
 
-      const startDateISO = startDateTime.toISOString();
-      const endDateISO = endDateTime.toISOString();
+      if (startDateTime <= new Date()) {
+        toast({
+          className: "bg-red-800 text-white hover:bg-red-700",
+          title: "Ошибка",
+          description: "Дата и время начала должны быть в будущем"
+        });
+        return;
+      }
+
+      if (endDateTime <= startDateTime) {
+        toast({
+          className: "bg-red-800 text-white hover:bg-red-700",
+          title: "Ошибка",
+          description: "Дата окончания должна быть позже даты начала"
+        });
+        return;
+      }
+
+      const startDateISO = toIsoPreserveLocal(startDateTime);
+      const endDateISO = toIsoPreserveLocal(endDateTime);
 
       await createEventMutation.mutateAsync({
         params: {
@@ -279,7 +361,20 @@ export const CreateEventDialog = ({ open, onOpenChange, onSuccess }: CreateEvent
         </DialogHeader>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className='space-y-4'>
+          <form 
+            onSubmit={form.handleSubmit(
+              onSubmit,
+              (errors) => {
+                console.log("Ошибки валидации формы:", errors);
+                toast({
+                  className: "bg-red-800 text-white hover:bg-red-700",
+                  title: "Ошибка валидации",
+                  description: "Проверьте заполнение всех обязательных полей"
+                });
+              }
+            )} 
+            className='space-y-4'
+          >
             <FormField
               control={form.control}
               name='title'
@@ -351,7 +446,16 @@ export const CreateEventDialog = ({ open, onOpenChange, onSuccess }: CreateEvent
                     <FormItem>
                       <FormLabel>Время начала *</FormLabel>
                       <FormControl>
-                        <Input type='time' {...field} />
+                        <Input
+                          type='time'
+                          lang='ru'
+                          inputMode='numeric'
+                          pattern='[0-9]{2}:[0-9]{2}'
+                          step={60}
+                          placeholder='ЧЧ:ММ'
+                          className='[&::-webkit-datetime-edit-ampm-field]:hidden'
+                          {...field}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -381,7 +485,16 @@ export const CreateEventDialog = ({ open, onOpenChange, onSuccess }: CreateEvent
                     <FormItem>
                       <FormLabel>Время окончания *</FormLabel>
                       <FormControl>
-                        <Input type='time' {...field} />
+                        <Input
+                          type='time'
+                          lang='ru'
+                          inputMode='numeric'
+                          pattern='[0-9]{2}:[0-9]{2}'
+                          step={60}
+                          placeholder='ЧЧ:ММ'
+                          className='[&::-webkit-datetime-edit-ampm-field]:hidden'
+                          {...field}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -416,6 +529,19 @@ export const CreateEventDialog = ({ open, onOpenChange, onSuccess }: CreateEvent
                           />
                         </div>
                       )}
+                      {(imagePreview || imageFile) && (
+                        <Button
+                          type='button'
+                          variant='outline'
+                          size='sm'
+                          onClick={() => {
+                            form.setValue("imageFile", undefined);
+                            setImagePreview(null);
+                          }}
+                        >
+                          Очистить выбранный файл
+                        </Button>
+                      )}
                     </div>
                   </FormControl>
                   <FormDescription>Максимальный размер файла: 10 МБ</FormDescription>
@@ -423,6 +549,23 @@ export const CreateEventDialog = ({ open, onOpenChange, onSuccess }: CreateEvent
                 </FormItem>
               )}
             />
+
+            {!imageFile && (
+              <FormField
+                control={form.control}
+                name='imageUrl'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Ссылка на изображение (альтернатива загрузке)</FormLabel>
+                    <FormControl>
+                      <Input placeholder='https://example.com/image.jpg' {...field} />
+                    </FormControl>
+                    <FormDescription>Можно указать ссылку вместо загрузки файла</FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
 
             <FormField
               control={form.control}
@@ -454,7 +597,7 @@ export const CreateEventDialog = ({ open, onOpenChange, onSuccess }: CreateEvent
                       type='number'
                       placeholder='Не указано'
                       min={1}
-                      {...field}
+                      value={field.value ?? ""}
                       onChange={(e) =>
                         field.onChange(e.target.value ? Number(e.target.value) : undefined)
                       }

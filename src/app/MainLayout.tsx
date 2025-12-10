@@ -18,6 +18,7 @@ export const MainLayout = () => {
   const [searchQuery, setSearchQuery] = useState(searchParams.get("search") || "");
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isEventsPage = location.pathname === "/";
+  const isAdminRoute = location.pathname.startsWith(PATHS.ADMIN);
   const { data: profileData } = useGetProfileQuery({
     options: {
       enabled: isAuth
@@ -60,79 +61,81 @@ export const MainLayout = () => {
 
   return (
     <div className='flex min-h-screen flex-col'>
-      <header className='border-b'>
-        <div className='container mx-auto flex h-16 items-center justify-between gap-4 px-4'>
-          <div className='flex items-center gap-6'>
-            <Link to='/' className='flex items-center gap-2'>
-              <span className='text-2xl font-bold'>myAfisha</span>
-            </Link>
-            {isAuth && (
-              <nav className='hidden items-center gap-2 md:flex'>
-                <Button asChild variant='ghost' className='gap-2'>
-                  <Link to={PATHS.PROFILE}>
-                    <User className='h-4 w-4' />
-                    Профиль
-                  </Link>
-                </Button>
-                <Button asChild variant='ghost' className='gap-2'>
-                  <Link to={PATHS.TICKETS}>
-                    <Ticket className='h-4 w-4' />
-                    Мои афиши
-                  </Link>
-                </Button>
-                {isAdmin && (
+      {!isAdminRoute && (
+        <header className='border-b'>
+          <div className='container mx-auto flex h-16 items-center justify-between gap-4 px-4'>
+            <div className='flex items-center gap-6'>
+              <Link to='/' className='flex items-center gap-2'>
+                <span className='text-2xl font-bold'>myAfisha</span>
+              </Link>
+              {isAuth && (
+                <nav className='hidden items-center gap-2 md:flex'>
                   <Button asChild variant='ghost' className='gap-2'>
-                    <Link to={PATHS.ADMIN}>
-                      <Shield className='h-4 w-4' />
-                      Админ
+                    <Link to={PATHS.PROFILE}>
+                      <User className='h-4 w-4' />
+                      Профиль
                     </Link>
                   </Button>
-                )}
-              </nav>
-            )}
-          </div>
-          {isEventsPage && (
-            <div className='relative hidden flex-1 max-w-md md:block'>
-              <Search className='absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground' />
-              <Input
-                type='text'
-                placeholder='Поиск по названию или описанию...'
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className='pl-9'
-              />
+                  <Button asChild variant='ghost' className='gap-2'>
+                    <Link to={PATHS.TICKETS}>
+                      <Ticket className='h-4 w-4' />
+                      Мои афиши
+                    </Link>
+                  </Button>
+                  {isAdmin && (
+                    <Button asChild variant='ghost' className='gap-2'>
+                      <Link to={PATHS.ADMIN}>
+                        <Shield className='h-4 w-4' />
+                        Админ
+                      </Link>
+                    </Button>
+                  )}
+                </nav>
+              )}
             </div>
-          )}
-          <div className='flex items-center gap-4'>
-            {isAuth ? (
-              <>
-                <div className='hidden items-center gap-4 md:flex'>
-                  <LogoutButton />
-                  <ThemeToggle />
-                </div>
-                <MobileMenu />
-              </>
-            ) : (
-              <>
-                <div className='hidden items-center gap-4 md:flex'>
-                  <Button asChild variant='outline'>
-                    <Link to={PATHS.SIGNIN}>Войти</Link>
-                  </Button>
-                  <Button asChild>
-                    <Link to={PATHS.SIGNUP}>Регистрация</Link>
-                  </Button>
-                  <ThemeToggle />
-                </div>
-                <MobileMenu />
-              </>
+            {isEventsPage && (
+              <div className='relative hidden flex-1 max-w-md md:block'>
+                <Search className='absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground' />
+                <Input
+                  type='text'
+                  placeholder='Поиск по названию или описанию...'
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className='pl-9'
+                />
+              </div>
             )}
+            <div className='flex items-center gap-4'>
+              {isAuth ? (
+                <>
+                  <div className='hidden items-center gap-4 md:flex'>
+                    <LogoutButton />
+                    <ThemeToggle />
+                  </div>
+                  <MobileMenu />
+                </>
+              ) : (
+                <>
+                  <div className='hidden items-center gap-4 md:flex'>
+                    <Button asChild variant='outline'>
+                      <Link to={PATHS.SIGNIN}>Войти</Link>
+                    </Button>
+                    <Button asChild>
+                      <Link to={PATHS.SIGNUP}>Регистрация</Link>
+                    </Button>
+                    <ThemeToggle />
+                  </div>
+                  <MobileMenu />
+                </>
+              )}
+            </div>
           </div>
-        </div>
-      </header>
+        </header>
+      )}
       <main className='flex-1'>
         <Outlet />
       </main>
-      <Footer />
+      {!isAdminRoute && <Footer />}
     </div>
   );
 };

@@ -1,6 +1,7 @@
 import { getStatusLabel } from "@modules/events/lib/events-data";
 import type { Event } from "@modules/events/types/event";
 import { CalendarRange, Users, MapPin, Wallet } from "lucide-react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import {
@@ -34,6 +35,8 @@ const formatDate = (dateString: string): string => {
 
 export const EventCard = ({ event }: EventCardProps) => {
   const navigate = useNavigate();
+  const [imageLoaded, setImageLoaded] = useState(false);
+  const [imageError, setImageError] = useState(false);
 
   const handleCardClick = () => {
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -83,11 +86,18 @@ export const EventCard = ({ event }: EventCardProps) => {
       <div onClick={handleCardClick} className='block h-full cursor-pointer'>
         <Card className='group flex h-full flex-col overflow-hidden bg-card transition hover:-translate-y-1 hover:shadow-lg'>
           <div className='relative h-48 overflow-hidden'>
-            <img
-              src={event.imageUrl || "/placeholder.svg"}
-              alt={event.title}
-              className='h-full w-full object-cover transition duration-500 group-hover:scale-105'
-            />
+            {!imageLoaded || imageError ? (
+              <div className='absolute inset-0 animate-pulse bg-muted' />
+            ) : null}
+            {!imageError && (
+              <img
+                src={event.imageUrl || "/placeholder.svg"}
+                alt=''
+                className='h-full w-full object-cover transition duration-500 group-hover:scale-105'
+                onLoad={() => setImageLoaded(true)}
+                onError={() => setImageError(true)}
+              />
+            )}
 
             <div
               className={`absolute left-4 top-4 inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium ${statusStyles[event.status]}`}
@@ -124,14 +134,6 @@ export const EventCard = ({ event }: EventCardProps) => {
                 {event.participantsCount}
                 {event.participantsLimit ? ` / ${event.participantsLimit}` : ""} участников
               </span>
-            </div>
-            <div className='flex items-center gap-2'>
-              <div
-                className={`inline-flex items-center gap-2 rounded-full border px-2 py-1 text-xs font-medium ${statusStyles[event.status]}`}
-              >
-                <span className='h-2 w-2 rounded-full bg-current opacity-70' />
-                {getStatusLabel(event.status)}
-              </div>
             </div>
           </CardContent>
         </Card>

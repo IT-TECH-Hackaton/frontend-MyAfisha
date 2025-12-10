@@ -14,6 +14,7 @@ interface YandexMapPickerProps {
 declare global {
   interface Window {
     ymaps: any;
+    __ymapsLoading?: Promise<void>;
   }
 }
 
@@ -31,53 +32,86 @@ export const YandexMapPicker = ({
   const [isSearching, setIsSearching] = useState(false);
 
   useEffect(() => {
-    if (!window.ymaps) {
-      const apiKey = import.meta.env.YANDEX_API_KEY || import.meta.env.VITE_YANDEX_API_KEY;
-      if (!apiKey) {
-        console.error("Yandex Maps API key is not set. Please set YANDEX_API_KEY in .env file");
-        return;
-      }
+    if (mapLoaded) return;
 
-      const script = document.createElement("script");
-      script.src = `https://api-maps.yandex.ru/2.1/?apikey=${apiKey}&lang=ru_RU`;
-      script.async = true;
-      script.onload = () => {
+    const apiKey = import.meta.env.YANDEX_API_KEY || import.meta.env.VITE_YANDEX_API_KEY;
+    if (!apiKey) {
+      console.error("Yandex Maps API key is not set. Please set YANDEX_API_KEY in .env file");
+      return;
+    }
+
+    const ensureScript = () => {
+      if (window.ymaps) return Promise.resolve();
+      if (!window.__ymapsLoading) {
+        window.__ymapsLoading = new Promise<void>((resolve, reject) => {
+          const script = document.createElement("script");
+          script.src = `https://api-maps.yandex.ru/2.1/?apikey=${apiKey}&lang=ru_RU`;
+          script.async = true;
+          script.onload = () => resolve();
+          script.onerror = reject;
+          document.head.appendChild(script);
+        });
+      }
+      return window.__ymapsLoading;
+    };
+
+    ensureScript()
+      .then(() => {
         if (window.ymaps && mapRef.current && !mapLoaded) {
           initializeMap();
         }
-      };
-      document.head.appendChild(script);
+      })
+      .catch((err) => {
+        console.error("Failed to load Yandex Maps script", err);
+      });
+  }, [mapLoaded]);
 
-      return () => {
-        if (document.head.contains(script)) {
-          document.head.removeChild(script);
-        }
-      };
-    } else if (window.ymaps && mapRef.current && !mapLoaded) {
-      initializeMap();
+  useEffect(() => {
+    if (mapLoaded && mapInstanceRef.current && initialCoordinates) {
+      mapInstanceRef.current.setCenter([initialCoordinates.lat, initialCoordinates.lon], 10);
+      if (placemarkRef.current) {
+        placemarkRef.current.geometry.setCoordinates([initialCoordinates.lat, initialCoordinates.lon]);
+      }
     }
-  }, [mapLoaded, initialCoordinates, onLocationSelect]);
+  }, [mapLoaded, initialCoordinates]);
 
   const initializeMap = () => {
     if (!window.ymaps || !mapRef.current || mapLoaded) return;
 
     window.ymaps.ready(() => {
-        const defaultCenter = initialCoordinates
-          ? [initialCoordinates.lat, initialCoordinates.lon]
-          : [55.751574, 37.573856];
+      const defaultCenter = initialCoordinates
+        ? [initialCoordinates.lat, initialCoordinates.lon]
+        : [55.751574, 37.573856];
 
-        const map = new window.ymaps.Map(mapRef.current, {
-          center: defaultCenter,
-          zoom: 10,
-          controls: ["zoomControl", "fullscreenControl"]
-        });
+      const map = new window.ymaps.Map(mapRef.current, {
+        center: defaultCenter,
+        zoom: 10,
+        controls: ["zoomControl", "fullscreenControl"]
+      });
 
-        mapInstanceRef.current = map;
-        let currentPlacemark: any = null;
+      mapInstanceRef.current = map;
+      let currentPlacemark: any = null;
 
-        if (initialCoordinates) {
+      if (initialCoordinates) {
+        currentPlacemark = new window.ymaps.Placemark(
+          [initialCoordinates.lat, initialCoordinates.lon],
+          {},
+          {
+            draggable: true
+          }
+        );
+        map.geoObjects.add(currentPlacemark);
+        placemarkRef.current = currentPlacemark;
+      }
+
+      map.events.add("click", (e: any) => {
+        const coords = e.get("coords");
+
+        if (currentPlacemark) {
+          currentPlacemark.geometry.setCoordinates(coords);
+        } else {
           currentPlacemark = new window.ymaps.Placemark(
-            [initialCoordinates.lat, initialCoordinates.lon],
+            coords,
             {},
             {
               draggable: true
@@ -87,23 +121,20 @@ export const YandexMapPicker = ({
           placemarkRef.current = currentPlacemark;
         }
 
-        map.events.add("click", (e: any) => {
-          const coords = e.get("coords");
+        window.ymaps.geocode(coords).then((res: any) => {
+          const firstGeoObject = res.geoObjects.get(0);
+          const addr = firstGeoObject
+            ? firstGeoObject.getAddressLine()
+            : `${coords[0].toFixed(6)}, ${coords[1].toFixed(6)}`;
+          setAddress(addr);
+          setAddressInput(addr);
+          onLocationSelect({ lat: coords[0], lon: coords[1] }, addr);
+        });
+      });
 
-          if (currentPlacemark) {
-            currentPlacemark.geometry.setCoordinates(coords);
-          } else {
-            currentPlacemark = new window.ymaps.Placemark(
-              coords,
-              {},
-              {
-                draggable: true
-              }
-            );
-            map.geoObjects.add(currentPlacemark);
-            placemarkRef.current = currentPlacemark;
-          }
-
+      if (currentPlacemark) {
+        currentPlacemark.events.add("dragend", () => {
+          const coords = currentPlacemark.geometry.getCoordinates();
           window.ymaps.geocode(coords).then((res: any) => {
             const firstGeoObject = res.geoObjects.get(0);
             const addr = firstGeoObject
@@ -114,25 +145,11 @@ export const YandexMapPicker = ({
             onLocationSelect({ lat: coords[0], lon: coords[1] }, addr);
           });
         });
+      }
 
-        if (currentPlacemark) {
-          currentPlacemark.events.add("dragend", () => {
-            const coords = currentPlacemark.geometry.getCoordinates();
-            window.ymaps.geocode(coords).then((res: any) => {
-              const firstGeoObject = res.geoObjects.get(0);
-              const addr = firstGeoObject
-                ? firstGeoObject.getAddressLine()
-                : `${coords[0].toFixed(6)}, ${coords[1].toFixed(6)}`;
-              setAddress(addr);
-              setAddressInput(addr);
-              onLocationSelect({ lat: coords[0], lon: coords[1] }, addr);
-            });
-          });
-        }
-
-        setMapLoaded(true);
-      });
-    };
+      setMapLoaded(true);
+    });
+  };
 
   const handleAddressSearch = () => {
     if (!addressInput.trim() || !window.ymaps || !mapInstanceRef.current) return;

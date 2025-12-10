@@ -379,7 +379,7 @@ export const EventDetailsPage = () => {
       )}
 
       <div className='mt-6 flex flex-wrap gap-3'>
-        {isAuth && event.status === "active" && (
+        {event.status === "active" && (
           <>
             {event.userParticipating ? (
               <Button
@@ -392,6 +392,11 @@ export const EventDetailsPage = () => {
             ) : (
               <Button
                 onClick={() => {
+                  if (!isAuth) {
+                    window.scrollTo({ top: 0, behavior: "auto" });
+                    window.location.href = "/sign-in";
+                    return;
+                  }
                   if (event.participantsLimit && event.participantsCount >= event.participantsLimit) {
                     toast({
                       className: "bg-red-800 text-white hover:bg-red-700",

@@ -8,9 +8,9 @@ export type UploadImageConfig = RequestConfig<UploadImageParams>;
 
 export const uploadImage = async ({ params, config }: UploadImageConfig) => {
   const formData = new FormData();
-  formData.append("file", params.file);
+  formData.append("image", params.file);
 
-  return api.post<{ url: string }>("upload/image", formData, {
+  return api.post<{ imageURL?: string; url?: string; path?: string }>("upload/image", formData, {
     ...config,
     headers: {
       "Content-Type": "multipart/form-data",
