@@ -1,7 +1,7 @@
 import type { Event, EventStatus } from "@modules/events/types/event";
 import type { EventResponse } from "../api/requests/getEvents";
 
-export const mapEventResponseToEvent = (response: EventResponse): Event => {
+export const mapEventResponseToEvent = (response: EventResponse & { averageRating?: number; totalReviews?: number }): Event => {
   const statusMap: Record<string, EventStatus> = {
     Активное: "active",
     Прошедшее: "past",
@@ -24,7 +24,9 @@ export const mapEventResponseToEvent = (response: EventResponse): Event => {
     location: response.address,
     coordinates: response.latitude && response.longitude
       ? { lat: response.latitude, lon: response.longitude }
-      : undefined
+      : undefined,
+    averageRating: response.averageRating,
+    totalReviews: response.totalReviews
   };
 };
 

@@ -7,5 +7,9 @@ export const PATHS = {
   FORGOT_PASSWORD: "/forgot-password",
   RESET_PASSWORD: "/reset-password",
   EMAIL_VERIFY: "/email-verify",
-  OAUTH_CALLBACK: "/oauth/callback"
+  OAUTH_CALLBACK: "/oauth/callback",
+  ABOUT: "/about",
+  TERMS: "/terms",
+  PRIVACY: "/privacy",
+  CONTACTS: "/contacts"
 } as const;

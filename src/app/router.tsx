@@ -9,6 +9,7 @@ import {
   SignUpPage
 } from "@modules/auth";
 import { EventDetailsPage } from "@modules/events/EventDetailsPage";
+import { TicketsPage } from "@modules/events/TicketsPage";
 import { ProfilePage } from "@modules/user/profile";
 import { createBrowserRouter } from "react-router-dom";
 
@@ -18,6 +19,10 @@ import { MainLayout } from "./MainLayout";
 import { NotFoundPage } from "./NotFoundPage";
 import { PrivateRoute } from "./PrivateRoute";
 import RootPage from "./RootPage";
+import { AboutPage } from "./pages/AboutPage";
+import { TermsPage } from "./pages/TermsPage";
+import { PrivacyPage } from "./pages/PrivacyPage";
+import { ContactsPage } from "./pages/ContactsPage";
 
 export const routes = createBrowserRouter([
   {
@@ -69,13 +74,29 @@ export const routes = createBrowserRouter([
           },
           {
             path: PATHS.TICKETS,
-            element: <div className='container mx-auto px-4 py-8'>Мои билеты</div>
+            element: <TicketsPage />
           },
           {
             path: PATHS.ADMIN,
             element: <AdminPage />
           }
         ]
+      },
+      {
+        path: PATHS.ABOUT,
+        element: <AboutPage />
+      },
+      {
+        path: PATHS.TERMS,
+        element: <TermsPage />
+      },
+      {
+        path: PATHS.PRIVACY,
+        element: <PrivacyPage />
+      },
+      {
+        path: PATHS.CONTACTS,
+        element: <ContactsPage />
       },
       {
         path: "*",

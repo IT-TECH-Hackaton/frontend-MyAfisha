@@ -1,8 +1,8 @@
 import { Link } from "react-router-dom";
-import { Facebook, Instagram, Mail, MapPin, Phone, Twitter } from "lucide-react";
+import { Mail, MapPin, Phone } from "lucide-react";
 
 import { PATHS } from "@shared/constants";
-import { cn } from "@shared/lib/utils";
+import { VKIcon, TelegramIcon, YandexIcon } from "@shared/ui/social-icons";
 
 export const Footer = () => {
   const currentYear = new Date().getFullYear();
@@ -20,25 +20,31 @@ export const Footer = () => {
             </p>
             <div className='flex gap-4'>
               <a
-                href='#'
+                href='https://vk.com'
+                target='_blank'
+                rel='noopener noreferrer'
                 className='rounded-full p-2 text-muted-foreground transition hover:bg-accent hover:text-foreground'
                 aria-label='ВКонтакте'
               >
-                <Twitter className='h-5 w-5' />
+                <VKIcon />
               </a>
               <a
-                href='#'
+                href='https://t.me'
+                target='_blank'
+                rel='noopener noreferrer'
                 className='rounded-full p-2 text-muted-foreground transition hover:bg-accent hover:text-foreground'
-                aria-label='Instagram'
+                aria-label='Telegram'
               >
-                <Instagram className='h-5 w-5' />
+                <TelegramIcon />
               </a>
               <a
-                href='#'
+                href='https://yandex.ru'
+                target='_blank'
+                rel='noopener noreferrer'
                 className='rounded-full p-2 text-muted-foreground transition hover:bg-accent hover:text-foreground'
-                aria-label='Facebook'
+                aria-label='Яндекс'
               >
-                <Facebook className='h-5 w-5' />
+                <YandexIcon />
               </a>
             </div>
           </div>
@@ -76,18 +82,30 @@ export const Footer = () => {
           <div className='space-y-4'>
             <h3 className='text-sm font-semibold'>Информация</h3>
             <nav className='flex flex-col gap-2'>
-              <a href='#' className='text-sm text-muted-foreground transition hover:text-foreground'>
+              <Link
+                to={PATHS.ABOUT}
+                className='text-sm text-muted-foreground transition hover:text-foreground'
+              >
                 О проекте
-              </a>
-              <a href='#' className='text-sm text-muted-foreground transition hover:text-foreground'>
+              </Link>
+              <Link
+                to={PATHS.TERMS}
+                className='text-sm text-muted-foreground transition hover:text-foreground'
+              >
                 Правила использования
-              </a>
-              <a href='#' className='text-sm text-muted-foreground transition hover:text-foreground'>
+              </Link>
+              <Link
+                to={PATHS.PRIVACY}
+                className='text-sm text-muted-foreground transition hover:text-foreground'
+              >
                 Политика конфиденциальности
-              </a>
-              <a href='#' className='text-sm text-muted-foreground transition hover:text-foreground'>
+              </Link>
+              <Link
+                to={PATHS.CONTACTS}
+                className='text-sm text-muted-foreground transition hover:text-foreground'
+              >
                 Контакты
-              </a>
+              </Link>
             </nav>
           </div>
 

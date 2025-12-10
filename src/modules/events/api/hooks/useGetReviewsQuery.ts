@@ -5,7 +5,7 @@ import { getReviews } from "../requests/getReviews";
 
 export const useGetReviewsQuery = (settings?: QuerySettings<typeof getReviews> & { params?: GetReviewsConfig["params"] }) => {
   const query = useQuery({
-    queryKey: ["getReviews", settings?.params?.id],
+    queryKey: ["getReviews", settings?.params?.id, settings?.params?.page, settings?.params?.limit],
     queryFn: async () => {
       if (!settings?.params?.id) {
         throw new Error("Event ID is required");

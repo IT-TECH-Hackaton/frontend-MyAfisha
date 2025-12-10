@@ -7,6 +7,7 @@ import { Loader2 } from "lucide-react";
 import { useCreateEventMutation } from "@modules/events/api/hooks/useCreateEventMutation";
 import { useUploadImageMutation } from "@shared/api/hooks/useUploadImageMutation";
 import { useGetCategoriesQuery } from "@modules/categories/api/hooks/useGetCategoriesQuery";
+import { useGetUsersQuery } from "../../api/hooks/useGetUsersQuery";
 import { YandexMapPicker } from "@shared/ui/yandex-map-picker";
 import { Button } from "@shared/ui/button";
 import { Badge } from "@shared/ui/badge";
@@ -80,10 +81,20 @@ export const CreateEventDialog = ({ open, onOpenChange, onSuccess }: CreateEvent
   const { toast } = useToast();
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+  const [selectedParticipants, setSelectedParticipants] = useState<string[]>([]);
 
   const uploadImageMutation = useUploadImageMutation();
   const { data: categoriesData, isLoading: isLoadingCategories } = useGetCategoriesQuery({
     options: { enabled: open }
+  });
+  const { data: usersData, isLoading: isLoadingUsers } = useGetUsersQuery({
+    params: {
+      limit: 1000,
+      status: "Активен"
+    },
+    options: {
+      enabled: open
+    }
   });
   const createEventMutation = useCreateEventMutation({
     options: {
@@ -95,6 +106,7 @@ export const CreateEventDialog = ({ open, onOpenChange, onSuccess }: CreateEvent
         form.reset();
         setImagePreview(null);
         setSelectedCategories([]);
+        setSelectedParticipants([]);
         onOpenChange(false);
         onSuccess?.();
       },
@@ -217,6 +229,7 @@ export const CreateEventDialog = ({ open, onOpenChange, onSuccess }: CreateEvent
           paymentInfo: values.paymentInfo || undefined,
           maxParticipants: values.maxParticipants,
           categoryIDs: selectedCategories.length > 0 ? selectedCategories : undefined,
+          participantIDs: selectedParticipants.length > 0 ? selectedParticipants : undefined,
           address: values.address || undefined,
           latitude: values.latitude,
           longitude: values.longitude,
@@ -433,6 +446,57 @@ export const CreateEventDialog = ({ open, onOpenChange, onSuccess }: CreateEvent
             />
 
             <FormItem>
+              <FormLabel>Участники</FormLabel>
+              {isLoadingUsers ? (
+                <div className='text-sm text-muted-foreground'>Загрузка пользователей...</div>
+              ) : (
+                <div className='space-y-2'>
+                  <div className='max-h-48 overflow-y-auto border rounded-md p-2 space-y-1'>
+                    {usersData?.data?.data?.map((user) => {
+                      const isSelected = selectedParticipants.includes(user.id);
+                      return (
+                        <div
+                          key={user.id}
+                          className={cn(
+                            "flex items-center gap-2 p-2 rounded-md cursor-pointer transition-colors",
+                            isSelected
+                              ? "bg-primary/10 border border-primary"
+                              : "hover:bg-accent"
+                          )}
+                          onClick={() => {
+                            if (isSelected) {
+                              setSelectedParticipants((prev) => prev.filter((id) => id !== user.id));
+                            } else {
+                              setSelectedParticipants((prev) => [...prev, user.id]);
+                            }
+                          }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => {}}
+                            className="cursor-pointer"
+                          />
+                          <span className="text-sm">{user.fullName}</span>
+                          <span className="text-xs text-muted-foreground ml-auto">{user.email}</span>
+                        </div>
+                      );
+                    })}
+                    {(!usersData?.data?.data || usersData.data.data.length === 0) && (
+                      <div className='text-sm text-muted-foreground p-2'>Пользователи не найдены</div>
+                    )}
+                  </div>
+                  {selectedParticipants.length > 0 && (
+                    <div className='text-sm text-muted-foreground'>
+                      Выбрано участников: {selectedParticipants.length}
+                    </div>
+                  )}
+                </div>
+              )}
+              <FormDescription>Выберите пользователей, которые будут участниками события. Им будет отправлено уведомление.</FormDescription>
+            </FormItem>
+
+            <FormItem>
               <FormLabel>Категории</FormLabel>
               {isLoadingCategories ? (
                 <div className='text-sm text-muted-foreground'>Загрузка категорий...</div>
@@ -506,6 +570,8 @@ export const CreateEventDialog = ({ open, onOpenChange, onSuccess }: CreateEvent
                 onClick={() => {
                   form.reset();
                   setImagePreview(null);
+                  setSelectedCategories([]);
+                  setSelectedParticipants([]);
                   onOpenChange(false);
                 }}
                 disabled={isLoading}

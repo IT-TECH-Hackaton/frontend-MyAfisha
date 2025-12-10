@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
+import { Download, Loader2, ChevronDown, Users, Shield, User } from "lucide-react";
 
 import { CreateEventDialog } from "./CreateEventDialog";
 import { useGetUsersQuery } from "../../api/hooks/useGetUsersQuery";
@@ -6,6 +7,7 @@ import { useGetAdminEventsQuery } from "../../api/hooks/useGetAdminEventsQuery";
 import { useUpdateUserMutation } from "../../api/hooks/useUpdateUserMutation";
 import { useDeleteUserMutation } from "../../api/hooks/useDeleteUserMutation";
 import { useResetUserPasswordMutation } from "../../api/hooks/useResetUserPasswordMutation";
+import { useExportUsersMutation } from "../../api/hooks/useExportUsersMutation";
 import { useUpdateEventMutation } from "@modules/events/api/hooks/useUpdateEventMutation";
 import { useDeleteEventMutation } from "@modules/events/api/hooks/useDeleteEventMutation";
 import { useGetCategoriesQuery } from "@modules/categories/api/hooks/useGetCategoriesQuery";
@@ -17,6 +19,7 @@ import type { AdminEventResponse } from "../../api/requests/getAdminEvents";
 import type { Category } from "@modules/categories/api/requests/getCategories";
 import { useToast } from "@shared/lib/hooks/use-toast";
 import { Badge } from "@shared/ui/badge";
+import { Button } from "@shared/ui/button";
 import { cn } from "@shared/lib/utils";
 
 import "./AdminPage.css";
@@ -41,6 +44,8 @@ function AdminPage() {
   });
   const [usersPage, setUsersPage] = useState(1);
   const [usersLimit] = useState(10);
+  const [exportMenuOpen, setExportMenuOpen] = useState(false);
+  const exportMenuRef = useRef<HTMLDivElement>(null);
 
   const { data: usersData, isLoading: isLoadingUsers, refetch: refetchUsers } = useGetUsersQuery({
     params: {
@@ -93,6 +98,43 @@ function AdminPage() {
       },
       onError: (error: any) => {
         const errorMessage = error?.response?.data?.message || "Не удалось удалить пользователя";
+        toast({
+          className: "bg-red-800 text-white hover:bg-red-700",
+          title: "Ошибка",
+          description: errorMessage
+        });
+      }
+    }
+  });
+
+  const exportUsersMutation = useExportUsersMutation({
+    options: {
+      onSuccess: async (response) => {
+        try {
+          const blob = response.data;
+          const url = window.URL.createObjectURL(blob);
+          const link = document.createElement("a");
+          link.href = url;
+          const fileName = `users_${new Date().toISOString().split("T")[0]}.xlsx`;
+          link.setAttribute("download", fileName);
+          document.body.appendChild(link);
+          link.click();
+          link.remove();
+          window.URL.revokeObjectURL(url);
+          toast({
+            title: "Экспорт выполнен",
+            description: "Список пользователей успешно скачан"
+          });
+        } catch (error) {
+          toast({
+            className: "bg-red-800 text-white hover:bg-red-700",
+            title: "Ошибка",
+            description: "Не удалось скачать файл"
+          });
+        }
+      },
+      onError: (error: any) => {
+        const errorMessage = error?.response?.data?.message || "Не удалось экспортировать пользователей";
         toast({
           className: "bg-red-800 text-white hover:bg-red-700",
           title: "Ошибка",
@@ -192,9 +234,14 @@ function AdminPage() {
   const [currentEvent, setCurrentEvent] = useState<AdminEventResponse | null>(null);
   const [eventForm, setEventForm] = useState({
     title: "",
+    shortDescription: "",
+    fullDescription: "",
     startDate: "",
     endDate: "",
-    participantsCount: 0,
+    maxParticipants: undefined as number | undefined,
+    paymentInfo: "",
+    address: "",
+    status: "Активное" as "Активное" | "Прошедшее" | "Отклоненное",
     location: null as { lat: number; lon: number; address?: string } | null
   });
   const [userForm, setUserForm] = useState({
@@ -322,11 +369,11 @@ function AdminPage() {
   };
 
 
-  const handleEventFormChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleEventFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setEventForm((prev) => ({
       ...prev,
-      [name]: name === "participantsCount" ? Number(value) : value
+      [name]: name === "maxParticipants" ? (value ? Number(value) : undefined) : value
     }));
   };
 
@@ -344,8 +391,12 @@ function AdminPage() {
     }
 
     const updateData: any = {
-      title: eventForm.title,
-      maxParticipants: eventForm.participantsCount || undefined
+      title: eventForm.title || undefined,
+      shortDescription: eventForm.shortDescription || undefined,
+      fullDescription: eventForm.fullDescription || undefined,
+      maxParticipants: eventForm.maxParticipants,
+      paymentInfo: eventForm.paymentInfo || undefined,
+      status: eventForm.status
     };
 
     if (eventForm.startDate) {
@@ -409,6 +460,37 @@ function AdminPage() {
     });
   };
 
+  const handleExport = (role?: "Пользователь" | "Администратор") => {
+    exportUsersMutation.mutate({
+      params: {
+        format: "xlsx",
+        fullName: filters.fullName || undefined,
+        role: role || filters.role || undefined,
+        status: filters.status || undefined,
+        dateFrom: filters.dateFrom || undefined,
+        dateTo: filters.dateTo || undefined
+      }
+    });
+    setExportMenuOpen(false);
+  };
+
+  // Close export menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (exportMenuRef.current && !exportMenuRef.current.contains(event.target as Node)) {
+        setExportMenuOpen(false);
+      }
+    };
+
+    if (exportMenuOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [exportMenuOpen]);
+
   const filteredUsers = users;
 
   return (
@@ -439,7 +521,64 @@ function AdminPage() {
       <main className='main-content'>
         {activeTab === "users" && (
           <div className='section-users'>
-            <h1>Управление пользователями</h1>
+            <div className='header-row'>
+              <h1>Управление пользователями</h1>
+              <div className='relative' ref={exportMenuRef}>
+                <Button
+                  onClick={() => setExportMenuOpen(!exportMenuOpen)}
+                  disabled={exportUsersMutation.isPending}
+                  className='bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white shadow-lg hover:shadow-xl transition-all duration-200 font-medium px-6 py-2.5 rounded-lg flex items-center gap-2'
+                >
+                  {exportUsersMutation.isPending ? (
+                    <>
+                      <Loader2 className='h-4 w-4 animate-spin' />
+                      Экспорт...
+                    </>
+                  ) : (
+                    <>
+                      <Download className='h-4 w-4' />
+                      Экспорт в XLSX
+                      <ChevronDown className='h-4 w-4' />
+                    </>
+                  )}
+                </Button>
+                {exportMenuOpen && !exportUsersMutation.isPending && (
+                  <div className='absolute right-0 mt-2 w-64 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-50 overflow-hidden'>
+                    <div className='py-1'>
+                      <button
+                        onClick={() => handleExport()}
+                        className='w-full text-left px-4 py-2.5 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2 transition-colors'
+                      >
+                        <Users className='h-4 w-4 text-gray-600 dark:text-gray-400' />
+                        <span>Все пользователи</span>
+                        <span className='ml-auto text-xs text-gray-500'>
+                          {filters.role ? `(фильтр: ${filters.role})` : ""}
+                        </span>
+                      </button>
+                      <button
+                        onClick={() => handleExport("Администратор")}
+                        className='w-full text-left px-4 py-2.5 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2 transition-colors border-t border-gray-200 dark:border-gray-700'
+                      >
+                        <Shield className='h-4 w-4 text-blue-600 dark:text-blue-400' />
+                        <span>Только администраторы</span>
+                      </button>
+                      <button
+                        onClick={() => handleExport("Пользователь")}
+                        className='w-full text-left px-4 py-2.5 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2 transition-colors border-t border-gray-200 dark:border-gray-700'
+                      >
+                        <User className='h-4 w-4 text-green-600 dark:text-green-400' />
+                        <span>Только пользователи</span>
+                      </button>
+                    </div>
+                    <div className='border-t border-gray-200 dark:border-gray-700 px-4 py-2 bg-gray-50 dark:bg-gray-900'>
+                      <p className='text-xs text-gray-500 dark:text-gray-400'>
+                        Применяются текущие фильтры (статус, даты, ФИО)
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
             <div className='filters-panel'>
               <div className='form-group'>
                 <label>ФИО</label>
@@ -726,11 +865,21 @@ function AdminPage() {
                               const endDate = new Date(event.endDate);
                               setEventForm({
                                 title: event.title,
+                                shortDescription: event.shortDescription || "",
+                                fullDescription: event.fullDescription || "",
                                 startDate: startDate.toISOString().split("T")[0],
                                 endDate: endDate.toISOString().split("T")[0],
-                                participantsCount: event.participantsCount,
+                                maxParticipants: event.maxParticipants,
+                                paymentInfo: event.paymentInfo || "",
+                                address: "",
+                                status: event.status,
                                 location: null
                               });
+                              if (event.categoryIDs) {
+                                setSelectedEventCategories(event.categoryIDs);
+                              } else {
+                                setSelectedEventCategories([]);
+                              }
                               setEditEventModalOpen(true);
                             }}
                           >
@@ -815,15 +964,63 @@ function AdminPage() {
                     required
                   />
                 </div>
+                <div className='form-group full-width'>
+                  <label>Краткое описание</label>
+                  <input
+                    type='text'
+                    name='shortDescription'
+                    className='form-input'
+                    value={eventForm.shortDescription}
+                    onChange={handleEventFormChange}
+                    placeholder='Краткое описание для карточки события'
+                  />
+                </div>
+                <div className='form-group full-width'>
+                  <label>Полное описание *</label>
+                  <textarea
+                    name='fullDescription'
+                    className='form-input'
+                    value={eventForm.fullDescription}
+                    onChange={handleEventFormChange}
+                    rows={4}
+                    required
+                    placeholder='Подробное описание события'
+                  />
+                </div>
                 <div className='form-group'>
-                  <label>Участники</label>
+                  <label>Максимальное количество участников</label>
                   <input
                     type='number'
-                    name='participantsCount'
+                    name='maxParticipants'
                     className='form-input'
-                    value={eventForm.participantsCount}
+                    value={eventForm.maxParticipants || ""}
                     onChange={handleEventFormChange}
-                    min={0}
+                    min={1}
+                    placeholder='Не указано'
+                  />
+                </div>
+                <div className='form-group'>
+                  <label>Статус</label>
+                  <select
+                    name='status'
+                    className='form-input'
+                    value={eventForm.status}
+                    onChange={handleEventFormChange}
+                  >
+                    <option value='Активное'>Активное</option>
+                    <option value='Прошедшее'>Прошедшее</option>
+                    <option value='Отклоненное'>Отклоненное</option>
+                  </select>
+                </div>
+                <div className='form-group full-width'>
+                  <label>Информация об оплате</label>
+                  <textarea
+                    name='paymentInfo'
+                    className='form-input'
+                    value={eventForm.paymentInfo}
+                    onChange={handleEventFormChange}
+                    rows={3}
+                    placeholder='Реквизиты, сумма, способ оплаты...'
                   />
                 </div>
                 <div className='form-group full-width'>

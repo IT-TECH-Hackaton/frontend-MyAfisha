@@ -5,9 +5,13 @@ import { useJoinEventMutation } from "@modules/events/api/hooks/useJoinEventMuta
 import { useLeaveEventMutation } from "@modules/events/api/hooks/useLeaveEventMutation";
 import { useExportParticipantsMutation } from "@modules/events/api/hooks/useExportParticipantsMutation";
 import { useGetProfileQuery } from "@modules/user/api/hooks/useGetProfileQuery";
+import { useGetReviewsQuery } from "@modules/events/api/hooks/useGetReviewsQuery";
 import { ArrowLeft, CalendarRange, MapPin, Users, Wallet, Download, CheckCircle2, XCircle } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
+import { AverageRating } from "./ui/AverageRating";
+import { ReviewForm } from "./ui/ReviewForm";
+import { ReviewsList } from "./ui/ReviewsList";
 
 import { AUTH_KEY } from "@shared/constants";
 import { useToast } from "@shared/lib/hooks/use-toast";
@@ -48,6 +52,19 @@ export const EventDetailsPage = () => {
   });
   const userRole = profileData?.data?.role?.toLowerCase();
   const isAdmin = isAuth && (userRole === "admin" || userRole === "администратор");
+  const currentUserId = profileData?.data?.uid;
+
+  const { data: reviewsData, refetch: refetchReviews } = useGetReviewsQuery({
+    params: { id: id || "", page: 1, limit: 10 },
+    options: {
+      enabled: !!id,
+      refetchOnWindowFocus: false
+    }
+  });
+
+  const hasUserReview = reviewsData?.data?.data?.some(
+    (review) => review.userID === currentUserId
+  ) || false;
 
   const { data: eventData, isLoading: loading, refetch } = useGetEventByIdQuery({
     params: { id: id || "" },
@@ -310,9 +327,52 @@ export const EventDetailsPage = () => {
                 </span>
               </div>
             </div>
+            {event.averageRating !== undefined && event.averageRating > 0 && (
+              <div className='pt-4 border-t'>
+                <AverageRating
+                  rating={event.averageRating}
+                  totalReviews={event.totalReviews || 0}
+                />
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
+
+      {event.status === "past" && (
+        <div className='mt-8 space-y-6'>
+          <div className='rounded-xl border bg-card p-6'>
+            <h2 className='mb-4 text-xl font-semibold'>Отзывы</h2>
+            {event.averageRating !== undefined && event.averageRating > 0 && (
+              <div className='mb-6'>
+                <AverageRating
+                  rating={event.averageRating}
+                  totalReviews={event.totalReviews || 0}
+                />
+              </div>
+            )}
+            {isAuth && event.userParticipating && !hasUserReview && (
+              <div className='mb-6 rounded-lg border bg-muted/50 p-4'>
+                <h3 className='mb-3 text-lg font-medium'>Оставить отзыв</h3>
+                <ReviewForm
+                  eventId={event.id}
+                  onSuccess={() => {
+                    refetch();
+                    refetchReviews();
+                  }}
+                />
+              </div>
+            )}
+            <ReviewsList
+              eventId={event.id}
+              onReviewUpdate={() => {
+                refetch();
+                refetchReviews();
+              }}
+            />
+          </div>
+        </div>
+      )}
 
       <div className='mt-6 flex flex-wrap gap-3'>
         {isAuth && event.status === "active" && (
