@@ -7,7 +7,7 @@ import { useExportParticipantsMutation } from "@modules/events/api/hooks/useExpo
 import { useGetProfileQuery } from "@modules/user/api/hooks/useGetProfileQuery";
 import { useGetReviewsQuery } from "@modules/events/api/hooks/useGetReviewsQuery";
 import { ArrowLeft, CalendarRange, MapPin, Users, Wallet, Download, CheckCircle2, XCircle } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useLayoutEffect } from "react";
 import { Link, useParams } from "react-router-dom";
 import { AverageRating } from "./ui/AverageRating";
 import { ReviewForm } from "./ui/ReviewForm";
@@ -167,6 +167,10 @@ export const EventDetailsPage = () => {
     return updatedEvents[0] || null;
   }, [eventData]);
 
+  useLayoutEffect(() => {
+    window.scrollTo({ top: 0, behavior: "auto" });
+  }, [id]);
+
   if (loading) {
     return (
       <div className='container mx-auto px-4 py-8'>
@@ -223,18 +227,18 @@ export const EventDetailsPage = () => {
         </div>
       </div>
 
-      <div className='grid gap-6 md:grid-cols-3'>
-        <div className='md:col-span-2 space-y-6'>
-          <div className='overflow-hidden rounded-xl border'>
+      <div className='grid gap-6 md:grid-cols-3 md:items-start'>
+        <div className='md:col-span-2 flex flex-col h-full gap-3'>
+          <div className='overflow-hidden rounded-xl border flex-shrink-0'>
             <img
               src={event.imageUrl || "/placeholder.svg"}
               alt={event.title}
               className='h-80 w-full object-cover'
             />
           </div>
-          <div className='rounded-xl border bg-card p-6'>
+          <div className='rounded-xl border bg-card p-6 flex-1 flex flex-col'>
             <h2 className='mb-3 text-xl font-semibold'>Описание</h2>
-            <p className='text-base leading-relaxed text-foreground'>{event.description}</p>
+            <p className='text-base leading-relaxed text-foreground flex-1'>{event.description}</p>
           </div>
         </div>
         <Card className='h-full'>

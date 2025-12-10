@@ -1,17 +1,16 @@
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useGetCategoriesQuery } from "@modules/categories/api/hooks/useGetCategoriesQuery";
+import { useCreateEventMutation } from "@modules/events/api/hooks/useCreateEventMutation";
+import { Loader2 } from "lucide-react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Loader2 } from "lucide-react";
 
-import { useCreateEventMutation } from "@modules/events/api/hooks/useCreateEventMutation";
 import { useUploadImageMutation } from "@shared/api/hooks/useUploadImageMutation";
-import { useGetCategoriesQuery } from "@modules/categories/api/hooks/useGetCategoriesQuery";
-import { useGetUsersQuery } from "../../api/hooks/useGetUsersQuery";
-import { YandexMapPicker } from "@shared/ui/yandex-map-picker";
-import { Button } from "@shared/ui/button";
-import { Badge } from "@shared/ui/badge";
+import { useToast } from "@shared/lib/hooks/use-toast";
 import { cn } from "@shared/lib/utils";
+import { Badge } from "@shared/ui/badge";
+import { Button } from "@shared/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -31,43 +30,61 @@ import {
 } from "@shared/ui/form";
 import { Input } from "@shared/ui/input";
 import { Textarea } from "@shared/ui/textarea";
-import { useToast } from "@shared/lib/hooks/use-toast";
+import { YandexMapPicker } from "@shared/ui/yandex-map-picker";
 
-const createEventSchema = z.object({
-  title: z.string().min(1, "Название обязательно").max(200, "Максимум 200 символов"),
-  shortDescription: z.string().max(500, "Максимум 500 символов").optional(),
-  fullDescription: z.string().min(1, "Полное описание обязательно").max(5000, "Максимум 5000 символов"),
-  startDate: z.string().min(1, "Дата начала обязательна"),
-  startTime: z.string().min(1, "Время начала обязательно"),
-  endDate: z.string().min(1, "Дата окончания обязательна"),
-  endTime: z.string().min(1, "Время окончания обязательно"),
-  imageFile: z.instanceof(File, { message: "Изображение обязательно" }).optional(),
-  paymentInfo: z.string().max(1000, "Максимум 1000 символов").optional(),
-  maxParticipants: z.coerce.number().int().positive("Должно быть положительным числом").optional(),
-  address: z.string().max(500, "Максимум 500 символов").optional(),
-  latitude: z.number().min(-90).max(90).optional(),
-  longitude: z.number().min(-180).max(180).optional(),
-  yandexMapLink: z.string().max(1000, "Максимум 1000 символов").optional()
-}).refine((data) => {
-  if (data.startDate && data.startTime && data.endDate && data.endTime) {
-    const start = new Date(`${data.startDate}T${data.startTime}`);
-    const end = new Date(`${data.endDate}T${data.endTime}`);
-    return end > start;
-  }
-  return true;
-}, {
-  message: "Дата и время окончания должны быть позже даты и времени начала",
-  path: ["endDate"]
-}).refine((data) => {
-  if (data.startDate && data.startTime) {
-    const start = new Date(`${data.startDate}T${data.startTime}`);
-    return start > new Date();
-  }
-  return true;
-}, {
-  message: "Дата и время начала должны быть в будущем",
-  path: ["startDate"]
-});
+import { useGetUsersQuery } from "../../api/hooks/useGetUsersQuery";
+
+const createEventSchema = z
+  .object({
+    title: z.string().min(1, "Название обязательно").max(200, "Максимум 200 символов"),
+    shortDescription: z.string().max(500, "Максимум 500 символов").optional(),
+    fullDescription: z
+      .string()
+      .min(1, "Полное описание обязательно")
+      .max(5000, "Максимум 5000 символов"),
+    startDate: z.string().min(1, "Дата начала обязательна"),
+    startTime: z.string().min(1, "Время начала обязательно"),
+    endDate: z.string().min(1, "Дата окончания обязательна"),
+    endTime: z.string().min(1, "Время окончания обязательно"),
+    imageFile: z.instanceof(File, { message: "Изображение обязательно" }).optional(),
+    paymentInfo: z.string().max(1000, "Максимум 1000 символов").optional(),
+    maxParticipants: z.coerce
+      .number()
+      .int()
+      .positive("Должно быть положительным числом")
+      .optional(),
+    address: z.string().max(500, "Максимум 500 символов").optional(),
+    latitude: z.number().min(-90).max(90).optional(),
+    longitude: z.number().min(-180).max(180).optional(),
+    yandexMapLink: z.string().max(1000, "Максимум 1000 символов").optional()
+  })
+  .refine(
+    (data) => {
+      if (data.startDate && data.startTime && data.endDate && data.endTime) {
+        const start = new Date(`${data.startDate}T${data.startTime}`);
+        const end = new Date(`${data.endDate}T${data.endTime}`);
+        return end > start;
+      }
+      return true;
+    },
+    {
+      message: "Дата и время окончания должны быть позже даты и времени начала",
+      path: ["endDate"]
+    }
+  )
+  .refine(
+    (data) => {
+      if (data.startDate && data.startTime) {
+        const start = new Date(`${data.startDate}T${data.startTime}`);
+        return start > new Date();
+      }
+      return true;
+    },
+    {
+      message: "Дата и время начала должны быть в будущем",
+      path: ["startDate"]
+    }
+  );
 
 type CreateEventFormValues = z.infer<typeof createEventSchema>;
 
@@ -191,7 +208,7 @@ export const CreateEventDialog = ({ open, onOpenChange, onSuccess }: CreateEvent
       const uploadResult = await uploadImageMutation.mutateAsync({
         params: { file: values.imageFile }
       });
-      
+
       if (!uploadResult.data.url) {
         toast({
           className: "bg-red-800 text-white hover:bg-red-700",
@@ -238,7 +255,8 @@ export const CreateEventDialog = ({ open, onOpenChange, onSuccess }: CreateEvent
       });
     } catch (error: any) {
       console.error("Error creating event:", error);
-      const errorMessage = error?.response?.data?.message || error?.message || "Не удалось создать событие";
+      const errorMessage =
+        error?.response?.data?.message || error?.message || "Не удалось создать событие";
       toast({
         className: "bg-red-800 text-white hover:bg-red-700",
         title: "Ошибка",
@@ -255,7 +273,8 @@ export const CreateEventDialog = ({ open, onOpenChange, onSuccess }: CreateEvent
         <DialogHeader>
           <DialogTitle>Создание события</DialogTitle>
           <DialogDescription>
-            Заполните форму для создания нового события. Поля, отмеченные *, обязательны для заполнения.
+            Заполните форму для создания нового события. Поля, отмеченные *, обязательны для
+            заполнения.
           </DialogDescription>
         </DialogHeader>
 
@@ -436,7 +455,9 @@ export const CreateEventDialog = ({ open, onOpenChange, onSuccess }: CreateEvent
                       placeholder='Не указано'
                       min={1}
                       {...field}
-                      onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : undefined)}
+                      onChange={(e) =>
+                        field.onChange(e.target.value ? Number(e.target.value) : undefined)
+                      }
                     />
                   </FormControl>
                   <FormDescription>Оставьте пустым, если лимит не установлен</FormDescription>
@@ -459,31 +480,35 @@ export const CreateEventDialog = ({ open, onOpenChange, onSuccess }: CreateEvent
                           key={user.id}
                           className={cn(
                             "flex items-center gap-2 p-2 rounded-md cursor-pointer transition-colors",
-                            isSelected
-                              ? "bg-primary/10 border border-primary"
-                              : "hover:bg-accent"
+                            isSelected ? "bg-primary/10 border border-primary" : "hover:bg-accent"
                           )}
                           onClick={() => {
                             if (isSelected) {
-                              setSelectedParticipants((prev) => prev.filter((id) => id !== user.id));
+                              setSelectedParticipants((prev) =>
+                                prev.filter((id) => id !== user.id)
+                              );
                             } else {
                               setSelectedParticipants((prev) => [...prev, user.id]);
                             }
                           }}
                         >
                           <input
-                            type="checkbox"
+                            type='checkbox'
                             checked={isSelected}
                             onChange={() => {}}
-                            className="cursor-pointer"
+                            className='cursor-pointer'
                           />
-                          <span className="text-sm">{user.fullName}</span>
-                          <span className="text-xs text-muted-foreground ml-auto">{user.email}</span>
+                          <span className='text-sm'>{user.fullName}</span>
+                          <span className='text-xs text-muted-foreground ml-auto'>
+                            {user.email}
+                          </span>
                         </div>
                       );
                     })}
                     {(!usersData?.data?.data || usersData.data.data.length === 0) && (
-                      <div className='text-sm text-muted-foreground p-2'>Пользователи не найдены</div>
+                      <div className='text-sm text-muted-foreground p-2'>
+                        Пользователи не найдены
+                      </div>
                     )}
                   </div>
                   {selectedParticipants.length > 0 && (
@@ -493,7 +518,10 @@ export const CreateEventDialog = ({ open, onOpenChange, onSuccess }: CreateEvent
                   )}
                 </div>
               )}
-              <FormDescription>Выберите пользователей, которые будут участниками события. Им будет отправлено уведомление.</FormDescription>
+              <FormDescription>
+                Выберите пользователей, которые будут участниками события. Им будет отправлено
+                уведомление.
+              </FormDescription>
             </FormItem>
 
             <FormItem>
@@ -516,7 +544,9 @@ export const CreateEventDialog = ({ open, onOpenChange, onSuccess }: CreateEvent
                         )}
                         onClick={() => {
                           if (isSelected) {
-                            setSelectedCategories((prev) => prev.filter((id) => id !== category.id));
+                            setSelectedCategories((prev) =>
+                              prev.filter((id) => id !== category.id)
+                            );
                           } else {
                             setSelectedCategories((prev) => [...prev, category.id]);
                           }
@@ -557,7 +587,9 @@ export const CreateEventDialog = ({ open, onOpenChange, onSuccess }: CreateEvent
                       />
                     </div>
                   </FormControl>
-                  <FormDescription>Кликните на карте, чтобы выбрать место проведения</FormDescription>
+                  <FormDescription>
+                    Кликните на карте, чтобы выбрать место проведения
+                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
@@ -589,4 +621,3 @@ export const CreateEventDialog = ({ open, onOpenChange, onSuccess }: CreateEvent
     </Dialog>
   );
 };
-

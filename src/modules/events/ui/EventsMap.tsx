@@ -146,6 +146,7 @@ export const EventsMap = ({ events, className }: EventsMapProps) => {
       );
 
       placemark.events.add("click", () => {
+        window.scrollTo({ top: 0, behavior: "smooth" });
         navigate(`/events/${event.id}`);
       });
 

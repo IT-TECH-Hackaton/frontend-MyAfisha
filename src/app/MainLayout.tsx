@@ -1,6 +1,6 @@
 import { Link, Outlet, useSearchParams, useLocation } from "react-router-dom";
 import { User, Ticket, Search, Shield } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useLayoutEffect } from "react";
 
 import { AUTH_KEY, PATHS } from "@shared/constants";
 import { Button } from "@shared/ui/button";
@@ -31,6 +31,10 @@ export const MainLayout = () => {
     const urlSearch = searchParams.get("search") || "";
     setSearchQuery(urlSearch);
   }, [searchParams]);
+
+  useLayoutEffect(() => {
+    window.scrollTo({ top: 0, behavior: "auto" });
+  }, [location.pathname]);
 
   useEffect(() => {
     if (searchTimeoutRef.current) {

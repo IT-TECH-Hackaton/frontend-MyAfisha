@@ -4,7 +4,7 @@ import { EventCard } from "@modules/events/ui/EventCard";
 import { EventsMap } from "@modules/events/ui/EventsMap";
 import { updateEventStatuses } from "@modules/events/lib/events-data";
 import { CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
-import { useMemo, useRef, useState, useEffect } from "react";
+import { useMemo, useRef, useState, useEffect, useLayoutEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 
 import { AUTH_KEY } from "@shared/constants";
@@ -67,6 +67,10 @@ export const EventsPage = () => {
   useEffect(() => {
     setPage(1);
   }, [activeTab, selectedDate, sortBy, sortOrder, searchQuery]);
+
+  useLayoutEffect(() => {
+    window.scrollTo({ top: 0, behavior: "auto" });
+  }, []);
 
   const { data: eventsData, isLoading, error: eventsError } = useGetEventsQuery({
     params: {
@@ -164,7 +168,13 @@ export const EventsPage = () => {
                   )}
                   <button
                     type='button'
-                    onClick={() => setSelectedDate(date)}
+                    onClick={() => {
+                      if (active) {
+                        setSelectedDate(null);
+                      } else {
+                        setSelectedDate(date);
+                      }
+                    }}
                     className={cn(
                       "flex min-w-[64px] flex-col items-center rounded-lg px-3 py-2 text-center text-sm transition",
                       active

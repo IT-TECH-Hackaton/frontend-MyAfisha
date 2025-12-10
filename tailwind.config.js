@@ -7,6 +7,15 @@ export default {
   ],
   theme: {
   	extend: {
+  		keyframes: {
+  			'skeleton-loading': {
+  				'0%': { backgroundPosition: '200% 0' },
+  				'100%': { backgroundPosition: '-200% 0' }
+  			}
+  		},
+  		animation: {
+  			'skeleton-loading': 'skeleton-loading 1.5s ease-in-out infinite'
+  		},
   		borderRadius: {
   			lg: 'var(--radius)',
   			md: 'calc(var(--radius) - 2px)',

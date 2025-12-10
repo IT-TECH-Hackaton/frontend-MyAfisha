@@ -1,4 +1,4 @@
-import AdminPage from "@modules/admin/components/adminPage/AdminPage";
+import AdminPage from "@modules/admin/AdminPage";
 import {
   AuthLayout,
   EmailVerifyPage,

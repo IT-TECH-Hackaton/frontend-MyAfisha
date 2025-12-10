@@ -1,12 +1,11 @@
-import { formatEventDateRange, getStatusLabel } from "@modules/events/lib/events-data";
+import { getStatusLabel } from "@modules/events/lib/events-data";
 import type { Event } from "@modules/events/types/event";
 import { CalendarRange, Users, MapPin, Wallet } from "lucide-react";
-import { Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle
 } from "@shared/ui/card";
@@ -34,6 +33,13 @@ const formatDate = (dateString: string): string => {
 };
 
 export const EventCard = ({ event }: EventCardProps) => {
+  const navigate = useNavigate();
+
+  const handleCardClick = () => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    navigate(`/events/${event.id}`);
+  };
+
   const tooltipContent = (
     <div className='space-y-2'>
       <div className='font-semibold text-base'>{event.title}</div>
@@ -74,8 +80,8 @@ export const EventCard = ({ event }: EventCardProps) => {
 
   return (
     <Tooltip content={tooltipContent}>
-      <Link to={`/events/${event.id}`} className='block h-full'>
-        <Card className='group flex h-full flex-col overflow-hidden bg-card transition hover:-translate-y-1 hover:shadow-lg cursor-pointer'>
+      <div onClick={handleCardClick} className='block h-full cursor-pointer'>
+        <Card className='group flex h-full flex-col overflow-hidden bg-card transition hover:-translate-y-1 hover:shadow-lg'>
           <div className='relative h-48 overflow-hidden'>
             <img
               src={event.imageUrl || "/placeholder.svg"}
@@ -129,7 +135,7 @@ export const EventCard = ({ event }: EventCardProps) => {
             </div>
           </CardContent>
         </Card>
-      </Link>
+      </div>
     </Tooltip>
   );
 };
