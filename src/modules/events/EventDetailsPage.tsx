@@ -16,6 +16,7 @@ import { ReviewsList } from "./ui/ReviewsList";
 import { AUTH_KEY } from "@shared/constants";
 import { useToast } from "@shared/lib/hooks/use-toast";
 import { Button } from "@shared/ui/button";
+import { Badge } from "@shared/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@shared/ui/card";
 import {
   Dialog,
@@ -239,6 +240,17 @@ export const EventDetailsPage = () => {
           <div className='rounded-xl border bg-card p-6 flex-1 flex flex-col'>
             <h2 className='mb-3 text-xl font-semibold'>Описание</h2>
             <p className='text-base leading-relaxed text-foreground flex-1'>{event.description}</p>
+            {event.tags && event.tags.length > 0 && (
+              <div className='mt-4 pt-4 border-t'>
+                <div className='flex flex-wrap gap-2'>
+                  {event.tags.map((tag) => (
+                    <Badge key={tag} variant='secondary' className='text-xs'>
+                      {tag}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
         <Card className='h-full'>
@@ -331,11 +343,11 @@ export const EventDetailsPage = () => {
                 </span>
               </div>
             </div>
-            {event.averageRating !== undefined && event.averageRating > 0 && (
+            {reviewsData?.data?.averageRating !== undefined && reviewsData.data.averageRating > 0 && (
               <div className='pt-4 border-t'>
                 <AverageRating
-                  rating={event.averageRating}
-                  totalReviews={event.totalReviews || 0}
+                  rating={reviewsData.data.averageRating}
+                  totalReviews={reviewsData.data.totalReviews || 0}
                 />
               </div>
             )}
@@ -347,19 +359,28 @@ export const EventDetailsPage = () => {
         <div className='mt-8 space-y-6'>
           <div className='rounded-xl border bg-card p-6'>
             <h2 className='mb-4 text-xl font-semibold'>Отзывы</h2>
-            {event.averageRating !== undefined && event.averageRating > 0 && (
+            {reviewsData?.data?.averageRating !== undefined && reviewsData.data.averageRating > 0 && (
               <div className='mb-6'>
                 <AverageRating
-                  rating={event.averageRating}
-                  totalReviews={event.totalReviews || 0}
+                  rating={reviewsData.data.averageRating}
+                  totalReviews={reviewsData.data.totalReviews || 0}
                 />
               </div>
             )}
-            {isAuth && event.userParticipating && !hasUserReview && (
+            {isAuth && event.userParticipating && (
               <div className='mb-6 rounded-lg border bg-muted/50 p-4'>
-                <h3 className='mb-3 text-lg font-medium'>Оставить отзыв</h3>
+                <h3 className='mb-3 text-lg font-medium'>
+                  {hasUserReview ? "Редактировать отзыв" : "Оставить отзыв"}
+                </h3>
                 <ReviewForm
                   eventId={event.id}
+                  existingReview={reviewsData?.data?.data?.find(
+                    (review) => review.userID === currentUserId
+                  ) ? {
+                    id: reviewsData.data.data.find((review) => review.userID === currentUserId)!.id,
+                    rating: reviewsData.data.data.find((review) => review.userID === currentUserId)!.rating,
+                    comment: reviewsData.data.data.find((review) => review.userID === currentUserId)!.comment
+                  } : undefined}
                   onSuccess={() => {
                     refetch();
                     refetchReviews();

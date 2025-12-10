@@ -3,6 +3,7 @@ import { Star } from "lucide-react";
 import { Button } from "@shared/ui/button";
 import { Textarea } from "@shared/ui/textarea";
 import { cn } from "@shared/lib/utils";
+import { useToast } from "@shared/lib/hooks/use-toast";
 import { useCreateReviewMutation } from "../api/hooks/useCreateReviewMutation";
 import { useUpdateReviewMutation } from "../api/hooks/useUpdateReviewMutation";
 
@@ -18,6 +19,7 @@ interface ReviewFormProps {
 }
 
 export const ReviewForm = ({ eventId, existingReview, onSuccess, onCancel }: ReviewFormProps) => {
+  const { toast } = useToast();
   const [rating, setRating] = useState(existingReview?.rating || 0);
   const [hoveredRating, setHoveredRating] = useState(0);
   const [comment, setComment] = useState(existingReview?.comment || "");
@@ -27,7 +29,19 @@ export const ReviewForm = ({ eventId, existingReview, onSuccess, onCancel }: Rev
       onSuccess: () => {
         setRating(0);
         setComment("");
+        toast({
+          title: "Отзыв создан",
+          description: "Ваш отзыв успешно добавлен"
+        });
         onSuccess?.();
+      },
+      onError: (error: any) => {
+        const errorMessage = error?.response?.data?.error || error?.message || "Не удалось создать отзыв";
+        toast({
+          className: "bg-red-800 text-white hover:bg-red-700",
+          title: "Ошибка",
+          description: errorMessage
+        });
       }
     }
   });
@@ -35,7 +49,19 @@ export const ReviewForm = ({ eventId, existingReview, onSuccess, onCancel }: Rev
   const updateMutation = useUpdateReviewMutation({
     options: {
       onSuccess: () => {
+        toast({
+          title: "Отзыв обновлен",
+          description: "Ваш отзыв успешно изменен"
+        });
         onSuccess?.();
+      },
+      onError: (error: any) => {
+        const errorMessage = error?.response?.data?.error || error?.message || "Не удалось обновить отзыв";
+        toast({
+          className: "bg-red-800 text-white hover:bg-red-700",
+          title: "Ошибка",
+          description: errorMessage
+        });
       }
     }
   });
@@ -50,7 +76,7 @@ export const ReviewForm = ({ eventId, existingReview, onSuccess, onCancel }: Rev
           eventId,
           reviewId: existingReview.id,
           rating,
-          comment
+          comment: comment.trim() || undefined
         }
       });
     } else {
@@ -58,7 +84,7 @@ export const ReviewForm = ({ eventId, existingReview, onSuccess, onCancel }: Rev
         params: {
           id: eventId,
           rating,
-          comment
+          comment: comment.trim() || undefined
         }
       });
     }

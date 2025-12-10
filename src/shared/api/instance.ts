@@ -3,7 +3,7 @@ import axios from "axios";
 import { TOKEN_KEY, PATHS, AUTH_KEY } from "@shared/constants";
 
 export const api = axios.create({
-  baseURL: import.meta.env.BASE_API_URL,
+  baseURL: import.meta.env.VITE_BASE_API_URL || import.meta.env.BASE_API_URL || "http://localhost:8081/api",
   withCredentials: true
 });
 

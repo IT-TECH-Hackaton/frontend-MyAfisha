@@ -18,6 +18,7 @@ export interface Event {
     lat: number;
     lon: number;
   };
+  tags?: string[];
 }
 
 export interface EventsApiError {

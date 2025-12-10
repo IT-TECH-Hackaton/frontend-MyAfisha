@@ -1,3 +1,5 @@
+import { getImageUrl } from "@shared/lib/imageUrl";
+
 import type { Event, EventStatus } from "@modules/events/types/event";
 import type { EventResponse } from "../api/requests/getEvents";
 
@@ -15,7 +17,7 @@ export const mapEventResponseToEvent = (response: EventResponse & { averageRatin
     description: response.fullDescription,
     startDate: response.startDate,
     endDate: response.endDate,
-    imageUrl: response.imageURL,
+    imageUrl: getImageUrl(response.imageURL),
     participantsCount: response.participantsCount,
     participantsLimit: response.maxParticipants,
     status: statusMap[response.status] || "active",
@@ -25,6 +27,7 @@ export const mapEventResponseToEvent = (response: EventResponse & { averageRatin
     coordinates: response.latitude && response.longitude
       ? { lat: response.latitude, lon: response.longitude }
       : undefined,
+    tags: response.tags,
     averageRating: response.averageRating,
     totalReviews: response.totalReviews
   };

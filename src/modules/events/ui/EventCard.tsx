@@ -82,62 +82,64 @@ export const EventCard = ({ event }: EventCardProps) => {
   );
 
   return (
-    <Tooltip content={tooltipContent}>
-      <div onClick={handleCardClick} className='block h-full cursor-pointer'>
-        <Card className='group flex h-full flex-col overflow-hidden bg-card transition hover:-translate-y-1 hover:shadow-lg'>
-          <div className='relative h-48 overflow-hidden'>
-            {!imageLoaded || imageError ? (
-              <div className='absolute inset-0 animate-pulse bg-muted' />
-            ) : null}
-            {!imageError && (
-              <img
-                src={event.imageUrl || "/placeholder.svg"}
-                alt=''
-                className='h-full w-full object-cover transition duration-500 group-hover:scale-105'
-                onLoad={() => setImageLoaded(true)}
-                onError={() => setImageError(true)}
-              />
-            )}
+    <>
+      <Tooltip content={tooltipContent}>
+        <div onClick={handleCardClick} className='block h-full cursor-pointer'>
+          <Card className='group flex h-full flex-col overflow-hidden bg-card transition hover:-translate-y-1 hover:shadow-lg'>
+            <div className='relative h-48 overflow-hidden'>
+              {!imageLoaded || imageError ? (
+                <div className='absolute inset-0 animate-pulse bg-muted' />
+              ) : null}
+              {!imageError && (
+                <img
+                  src={event.imageUrl || "/placeholder.svg"}
+                  alt=''
+                  className='h-full w-full object-cover transition duration-500 group-hover:scale-105'
+                  onLoad={() => setImageLoaded(true)}
+                  onError={() => setImageError(true)}
+                />
+              )}
 
-            <div
-              className={`absolute left-4 top-4 inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium ${statusStyles[event.status]}`}
-            >
-              <span className='h-2 w-2 rounded-full bg-current opacity-70' />
-              {getStatusLabel(event.status)}
-            </div>
-          </div>
-
-          <CardHeader className='space-y-2'>
-            <CardTitle className='text-lg leading-tight'>{event.title}</CardTitle>
-          </CardHeader>
-
-          <CardContent className='space-y-3'>
-            <div className='space-y-2 text-sm'>
-              <div className='flex items-center gap-2 text-muted-foreground'>
-                <CalendarRange className='h-4 w-4 flex-shrink-0' />
-                <div className='flex flex-col'>
-                  <span className='text-xs text-muted-foreground/70'>Начало</span>
-                  <span>{formatDate(event.startDate)}</span>
-                </div>
-              </div>
-              <div className='flex items-center gap-2 text-muted-foreground'>
-                <CalendarRange className='h-4 w-4 flex-shrink-0' />
-                <div className='flex flex-col'>
-                  <span className='text-xs text-muted-foreground/70'>Окончание</span>
-                  <span>{formatDate(event.endDate)}</span>
-                </div>
+              <div
+                className={`absolute left-4 top-4 inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium ${statusStyles[event.status]}`}
+              >
+                <span className='h-2 w-2 rounded-full bg-current opacity-70' />
+                {getStatusLabel(event.status)}
               </div>
             </div>
-            <div className='flex items-center gap-2 text-sm text-muted-foreground'>
-              <Users className='h-4 w-4 flex-shrink-0' />
-              <span>
-                {event.participantsCount}
-                {event.participantsLimit ? ` / ${event.participantsLimit}` : ""} участников
-              </span>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    </Tooltip>
+
+            <CardHeader className='space-y-2'>
+              <CardTitle className='text-lg leading-tight'>{event.title}</CardTitle>
+            </CardHeader>
+
+            <CardContent className='space-y-3'>
+              <div className='space-y-2 text-sm'>
+                <div className='flex items-center gap-2 text-muted-foreground'>
+                  <CalendarRange className='h-4 w-4 flex-shrink-0' />
+                  <div className='flex flex-col'>
+                    <span className='text-xs text-muted-foreground/70'>Начало</span>
+                    <span>{formatDate(event.startDate)}</span>
+                  </div>
+                </div>
+                <div className='flex items-center gap-2 text-muted-foreground'>
+                  <CalendarRange className='h-4 w-4 flex-shrink-0' />
+                  <div className='flex flex-col'>
+                    <span className='text-xs text-muted-foreground/70'>Окончание</span>
+                    <span>{formatDate(event.endDate)}</span>
+                  </div>
+                </div>
+              </div>
+              <div className='flex items-center gap-2 text-sm text-muted-foreground'>
+                <Users className='h-4 w-4 flex-shrink-0' />
+                <span>
+                  {event.participantsCount}
+                  {event.participantsLimit ? ` / ${event.participantsLimit}` : ""} участников
+                </span>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </Tooltip>
+    </>
   );
 };

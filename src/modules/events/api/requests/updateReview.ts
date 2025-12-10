@@ -1,7 +1,7 @@
 import { api } from "@shared/api/instance";
 
 export interface UpdateReviewParams {
-  rating?: number;
+  rating: number;
   comment?: string;
 }
 

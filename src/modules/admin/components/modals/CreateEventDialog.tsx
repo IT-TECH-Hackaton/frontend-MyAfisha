@@ -6,7 +6,6 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
-import { useUploadImageMutation } from "@shared/api/hooks/useUploadImageMutation";
 import { useToast } from "@shared/lib/hooks/use-toast";
 import { cn } from "@shared/lib/utils";
 import { Badge } from "@shared/ui/badge";
@@ -125,7 +124,6 @@ export const CreateEventDialog = ({ open, onOpenChange, onSuccess }: CreateEvent
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [selectedParticipants, setSelectedParticipants] = useState<string[]>([]);
 
-  const uploadImageMutation = useUploadImageMutation();
   const { data: categoriesData, isLoading: isLoadingCategories } = useGetCategoriesQuery({
     options: { enabled: open }
   });
@@ -228,54 +226,14 @@ export const CreateEventDialog = ({ open, onOpenChange, onSuccess }: CreateEvent
     console.log("imageUrl:", values.imageUrl);
     
     try {
-      let imageURL: string | undefined = values.imageUrl?.trim() || undefined;
+      const imageURL = values.imageUrl?.trim() || undefined;
+      const imageFile = values.imageFile;
 
-      if (!imageURL && values.imageFile) {
-        try {
-          const uploadResult = await uploadImageMutation.mutateAsync({
-            params: { file: values.imageFile }
-          });
-
-          console.log("Upload result:", uploadResult);
-          console.log("Upload result data:", uploadResult?.data);
-
-          imageURL =
-            uploadResult?.data?.imageURL ||
-            uploadResult?.data?.url ||
-            uploadResult?.data?.path ||
-            (uploadResult?.data as any)?.data?.imageURL;
-
-          console.log("Extracted imageURL:", imageURL);
-
-          if (!imageURL) {
-            toast({
-              className: "bg-red-800 text-white hover:bg-red-700",
-              title: "Ошибка",
-              description: "Сервер не вернул ссылку на изображение. Проверьте ответ сервера в консоли."
-            });
-            return;
-          }
-        } catch (error: any) {
-          console.error("Upload error:", error);
-          const errorMessage =
-            error?.response?.data?.error ||
-            error?.response?.data?.message ||
-            error?.message ||
-            "Не удалось загрузить изображение";
-          toast({
-            className: "bg-red-800 text-white hover:bg-red-700",
-            title: "Ошибка загрузки",
-            description: errorMessage
-          });
-          return;
-        }
-      }
-
-      if (!imageURL) {
+      if (!imageURL && !imageFile) {
         toast({
           className: "bg-red-800 text-white hover:bg-red-700",
           title: "Ошибка",
-          description: "Не удалось получить ссылку на изображение"
+          description: "Загрузите изображение или укажите ссылку"
         });
         return;
       }
@@ -325,6 +283,7 @@ export const CreateEventDialog = ({ open, onOpenChange, onSuccess }: CreateEvent
           startDate: startDateISO,
           endDate: endDateISO,
           imageURL,
+          imageFile,
           paymentInfo: values.paymentInfo || undefined,
           maxParticipants: values.maxParticipants,
           categoryIDs: selectedCategories.length > 0 ? selectedCategories : undefined,
@@ -338,7 +297,10 @@ export const CreateEventDialog = ({ open, onOpenChange, onSuccess }: CreateEvent
     } catch (error: any) {
       console.error("Error creating event:", error);
       const errorMessage =
-        error?.response?.data?.message || error?.message || "Не удалось создать событие";
+        error?.response?.data?.error ||
+        error?.response?.data?.message ||
+        error?.message ||
+        "Не удалось создать событие";
       toast({
         className: "bg-red-800 text-white hover:bg-red-700",
         title: "Ошибка",
@@ -347,7 +309,7 @@ export const CreateEventDialog = ({ open, onOpenChange, onSuccess }: CreateEvent
     }
   };
 
-  const isLoading = uploadImageMutation.isPending || createEventMutation.isPending;
+  const isLoading = createEventMutation.isPending;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

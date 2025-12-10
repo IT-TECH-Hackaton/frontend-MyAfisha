@@ -3,6 +3,7 @@ import { Star, Edit2, Trash2 } from "lucide-react";
 import { Button } from "@shared/ui/button";
 import { Card, CardContent } from "@shared/ui/card";
 import { cn } from "@shared/lib/utils";
+import { useToast } from "@shared/lib/hooks/use-toast";
 import { useGetReviewsQuery } from "../api/hooks/useGetReviewsQuery";
 import { useDeleteReviewMutation } from "../api/hooks/useDeleteReviewMutation";
 import { useGetProfileQuery } from "@modules/user/api/hooks/useGetProfileQuery";
@@ -14,6 +15,7 @@ interface ReviewsListProps {
 }
 
 export const ReviewsList = ({ eventId, onReviewUpdate }: ReviewsListProps) => {
+  const { toast } = useToast();
   const [page, setPage] = useState(1);
   const limit = 10;
   const [editingReviewId, setEditingReviewId] = useState<string | null>(null);
@@ -36,8 +38,20 @@ export const ReviewsList = ({ eventId, onReviewUpdate }: ReviewsListProps) => {
   const deleteMutation = useDeleteReviewMutation({
     options: {
       onSuccess: () => {
+        toast({
+          title: "Отзыв удален",
+          description: "Ваш отзыв успешно удален"
+        });
         refetch();
         onReviewUpdate?.();
+      },
+      onError: (error: any) => {
+        const errorMessage = error?.response?.data?.error || error?.message || "Не удалось удалить отзыв";
+        toast({
+          className: "bg-red-800 text-white hover:bg-red-700",
+          title: "Ошибка",
+          description: errorMessage
+        });
       }
     }
   });
