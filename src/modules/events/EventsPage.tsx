@@ -72,11 +72,24 @@ export const EventsPage = () => {
     window.scrollTo({ top: 0, behavior: "auto" });
   }, []);
 
+  const formatDateForAPI = (date: Date): string => {
+    const normalizedDate = new Date(date);
+    normalizedDate.setHours(0, 0, 0, 0);
+    normalizedDate.setMilliseconds(0);
+    normalizedDate.setSeconds(0);
+    normalizedDate.setMinutes(0);
+    const adjustedDate = new Date(normalizedDate.getTime() - 24 * 60 * 60 * 1000);
+    const year = adjustedDate.getFullYear();
+    const month = String(adjustedDate.getMonth() + 1).padStart(2, "0");
+    const day = String(adjustedDate.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  };
+
   const { data: eventsData, isLoading, error: eventsError } = useGetEventsQuery({
     params: {
       tab: activeTab === "my" ? "my" : activeTab === "active" ? "active" : activeTab === "past" ? "past" : "active",
-      dateFrom: selectedDate ? selectedDate.toISOString().split("T")[0] : undefined,
-      dateTo: selectedDate ? selectedDate.toISOString().split("T")[0] : undefined,
+      dateFrom: selectedDate ? formatDateForAPI(selectedDate) : undefined,
+      dateTo: selectedDate ? formatDateForAPI(selectedDate) : undefined,
       search: searchQuery || undefined,
       sortBy,
       sortOrder,
@@ -172,7 +185,9 @@ export const EventsPage = () => {
                       if (active) {
                         setSelectedDate(null);
                       } else {
-                        setSelectedDate(date);
+                        const normalizedDate = new Date(date);
+                        normalizedDate.setHours(0, 0, 0, 0);
+                        setSelectedDate(normalizedDate);
                       }
                     }}
                     className={cn(

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Star, Edit2, Trash2 } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@shared/ui/button";
 import { Card, CardContent } from "@shared/ui/card";
 import { cn } from "@shared/lib/utils";
@@ -16,6 +17,7 @@ interface ReviewsListProps {
 
 export const ReviewsList = ({ eventId, onReviewUpdate }: ReviewsListProps) => {
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
   const limit = 10;
   const [editingReviewId, setEditingReviewId] = useState<string | null>(null);
@@ -37,12 +39,14 @@ export const ReviewsList = ({ eventId, onReviewUpdate }: ReviewsListProps) => {
 
   const deleteMutation = useDeleteReviewMutation({
     options: {
-      onSuccess: () => {
+      onSuccess: async () => {
         toast({
           title: "Отзыв удален",
           description: "Ваш отзыв успешно удален"
         });
-        refetch();
+        queryClient.invalidateQueries({ queryKey: ["getReviews", eventId] });
+        queryClient.invalidateQueries({ queryKey: ["getEvents"] });
+        await refetch();
         onReviewUpdate?.();
       },
       onError: (error: any) => {

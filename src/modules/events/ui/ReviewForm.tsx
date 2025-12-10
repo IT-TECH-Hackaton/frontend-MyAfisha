@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Star } from "lucide-react";
 import { Button } from "@shared/ui/button";
 import { Textarea } from "@shared/ui/textarea";
@@ -23,6 +23,16 @@ export const ReviewForm = ({ eventId, existingReview, onSuccess, onCancel }: Rev
   const [rating, setRating] = useState(existingReview?.rating || 0);
   const [hoveredRating, setHoveredRating] = useState(0);
   const [comment, setComment] = useState(existingReview?.comment || "");
+
+  useEffect(() => {
+    if (existingReview) {
+      setRating(existingReview.rating);
+      setComment(existingReview.comment || "");
+    } else {
+      setRating(0);
+      setComment("");
+    }
+  }, [existingReview]);
 
   const createMutation = useCreateReviewMutation({
     options: {

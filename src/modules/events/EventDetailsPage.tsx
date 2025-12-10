@@ -9,6 +9,7 @@ import { useGetReviewsQuery } from "@modules/events/api/hooks/useGetReviewsQuery
 import { ArrowLeft, CalendarRange, MapPin, Users, Wallet, Download, CheckCircle2, XCircle } from "lucide-react";
 import { useMemo, useState, useLayoutEffect } from "react";
 import { Link, useParams } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { AverageRating } from "./ui/AverageRating";
 import { ReviewForm } from "./ui/ReviewForm";
 import { ReviewsList } from "./ui/ReviewsList";
@@ -41,6 +42,7 @@ const formatDate = (dateString: string): string => {
 export const EventDetailsPage = () => {
   const { id } = useParams<{ id: string }>();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const isAuth = localStorage.getItem(AUTH_KEY) === "true";
   const [isLeaveDialogOpen, setIsLeaveDialogOpen] = useState(false);
 
@@ -52,7 +54,7 @@ export const EventDetailsPage = () => {
     }
   });
   const userRole = profileData?.data?.role?.toLowerCase();
-  const isAdmin = isAuth && (userRole === "admin" || userRole === "администратор");
+  const isAdmin = isAuth && profileData?.data && (userRole === "admin" || userRole === "администратор");
   const currentUserId = profileData?.data?.uid;
 
   const { data: reviewsData, refetch: refetchReviews } = useGetReviewsQuery({
@@ -63,9 +65,24 @@ export const EventDetailsPage = () => {
     }
   });
 
-  const hasUserReview = reviewsData?.data?.data?.some(
-    (review) => review.userID === currentUserId
-  ) || false;
+  const hasUserReview = useMemo(() => {
+    return reviewsData?.data?.data?.some(
+      (review) => review.userID === currentUserId
+    ) || false;
+  }, [reviewsData?.data?.data, currentUserId]);
+
+  const existingReview = useMemo(() => {
+    if (!reviewsData?.data?.data || !currentUserId) return undefined;
+    const userReview = reviewsData.data.data.find(
+      (review) => review.userID === currentUserId
+    );
+    if (!userReview) return undefined;
+    return {
+      id: userReview.id,
+      rating: userReview.rating,
+      comment: userReview.comment || ""
+    };
+  }, [reviewsData?.data?.data, currentUserId]);
 
   const { data: eventData, isLoading: loading, refetch } = useGetEventByIdQuery({
     params: { id: id || "" },
@@ -373,26 +390,23 @@ export const EventDetailsPage = () => {
                   {hasUserReview ? "Редактировать отзыв" : "Оставить отзыв"}
                 </h3>
                 <ReviewForm
+                  key={`review-${existingReview?.id || "new"}-${hasUserReview}`}
                   eventId={event.id}
-                  existingReview={reviewsData?.data?.data?.find(
-                    (review) => review.userID === currentUserId
-                  ) ? {
-                    id: reviewsData.data.data.find((review) => review.userID === currentUserId)!.id,
-                    rating: reviewsData.data.data.find((review) => review.userID === currentUserId)!.rating,
-                    comment: reviewsData.data.data.find((review) => review.userID === currentUserId)!.comment
-                  } : undefined}
-                  onSuccess={() => {
+                  existingReview={existingReview}
+                  onSuccess={async () => {
+                    queryClient.invalidateQueries({ queryKey: ["getReviews", event.id] });
+                    await refetchReviews();
                     refetch();
-                    refetchReviews();
                   }}
                 />
               </div>
             )}
             <ReviewsList
               eventId={event.id}
-              onReviewUpdate={() => {
+              onReviewUpdate={async () => {
+                queryClient.invalidateQueries({ queryKey: ["getReviews", event.id] });
+                await refetchReviews();
                 refetch();
-                refetchReviews();
               }}
             />
           </div>
